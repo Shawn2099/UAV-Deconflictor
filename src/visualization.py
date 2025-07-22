@@ -1,142 +1,118 @@
 """
 visualization.py
 
-[V2 - 3D Enabled] This module provides functions to visualize the drone mission
-scenarios in 3D space.
+[V3 - 4D Animation Enabled] This module provides functions to visualize the
+drone mission scenarios in 3D space and creates an animated GIF to show the
+spatio-temporal evolution of the flights.
 """
 import matplotlib
 # Set the backend to 'Agg' to prevent GUI-related errors.
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 from typing import List, Dict, Any, Optional
+import numpy as np
 
 # Import our custom data models
-from .data_models import PrimaryMission, SimulatedFlight
+from .data_models import PrimaryMission, SimulatedFlight, Waypoint
 
-def create_3d_plot(
+class DynamicDrone:
+    """A helper class to manage the state and position of a drone over time."""
+    def __init__(self, waypoints: List[Waypoint], timestamps: List[float], color: str, marker: str, label: str):
+        self.waypoints = waypoints
+        self.timestamps = timestamps
+        self.color = color
+        self.marker = marker
+        self.label = label
+        self.path_line = None # To hold the static full path plot object
+        self.point_marker = None # To hold the moving drone marker plot object
+
+    def get_position(self, time: float) -> Optional[np.ndarray]:
+        """Calculates the drone's 3D position at a specific time."""
+        if time < self.timestamps[0] or time > self.timestamps[-1]:
+            return None # Drone is not active
+
+        for i in range(len(self.timestamps) - 1):
+            t1, t2 = self.timestamps[i], self.timestamps[i+1]
+            if t1 <= time <= t2:
+                p1 = np.array([self.waypoints[i].x, self.waypoints[i].y, self.waypoints[i].z])
+                p2 = np.array([self.waypoints[i+1].x, self.waypoints[i+1].y, self.waypoints[i+1].z])
+                
+                # Handle cases where a drone hovers (t1 == t2)
+                if t1 == t2:
+                    return p1
+                
+                # Calculate progress along the segment
+                progress = (time - t1) / (t2 - t1)
+                return p1 + progress * (p2 - p1)
+        return None
+
+def create_4d_animation(
     primary_mission: PrimaryMission, 
-    simulated_flights: List[SimulatedFlight], 
+    simulated_flights: List[SimulatedFlight],
+    primary_mission_etas: List[float],
     conflict_details: Optional[Dict[str, Any]] = None,
-    output_filename: Optional[str] = None
+    output_filename: Optional[str] = None,
+    duration_seconds: int = 10
 ):
     """
-    Generates and saves a 3D plot of the airspace scenario.
-
-    Args:
-        primary_mission: The primary drone's mission plan.
-        simulated_flights: A list of other drones' flight plans.
-        conflict_details: An optional dictionary containing conflict information.
-        output_filename: The path to save the generated plot image.
+    Generates and saves a 4D (3D + time) animation of the airspace scenario.
     """
-    # 1. Set up the 3D plot canvas
     fig = plt.figure(figsize=(14, 14))
     ax = fig.add_subplot(111, projection='3d')
-    ax.set_title("3D Airspace Visualization", fontsize=16)
-    ax.set_xlabel("X Coordinate (meters)", fontsize=12)
-    ax.set_ylabel("Y Coordinate (meters)", fontsize=12)
-    ax.set_zlabel("Z Coordinate (Altitude in meters)", fontsize=12)
+    ax.set_title("4D Airspace Visualization", fontsize=16)
+    ax.set_xlabel("X Coordinate (meters)")
+    ax.set_ylabel("Y Coordinate (meters)")
+    ax.set_zlabel("Z Coordinate (Altitude in meters)")
 
-    # 2. Plot the primary mission's path
-    px = [wp.x for wp in primary_mission.waypoints]
-    py = [wp.y for wp in primary_mission.waypoints]
-    pz = [wp.z for wp in primary_mission.waypoints]
-    ax.plot(px, py, pz, 'o-', color='blue', linewidth=2, markersize=8, label="Primary Mission")
-    ax.text(px[0], py[0], pz[0], ' Start', color='blue', fontsize=10)
-
-    # 3. Plot the simulated flights' paths
+    drones = []
+    # Add primary mission drone
+    drones.append(DynamicDrone(primary_mission.waypoints, primary_mission_etas, 'blue', 'o', 'Primary Mission'))
+    # Add simulated drones
     for flight in simulated_flights:
-        sx = [wp.x for wp in flight.waypoints]
-        sy = [wp.y for wp in flight.waypoints]
-        sz = [wp.z for wp in flight.waypoints]
-        ax.plot(sx, sy, sz, 's--', color='gray', linewidth=1.5, markersize=6, label=f"Sim Flight: {flight.flight_id}")
-        ax.text(sx[0], sy[0], sz[0], f' {flight.flight_id}', color='black', fontsize=9)
+        drones.append(DynamicDrone(flight.waypoints, flight.timestamps, 'gray', 's', f'Sim Flight: {flight.flight_id}'))
 
-    # 4. Highlight the conflict point if one exists
+    # Plot static elements
+    for drone in drones:
+        x = [wp.x for wp in drone.waypoints]
+        y = [wp.y for wp in drone.waypoints]
+        z = [wp.z for wp in drone.waypoints]
+        # Plot the full path as a faint dashed line
+        drone.path_line, = ax.plot(x, y, z, '--', color=drone.color, linewidth=1, alpha=0.5)
+        # Initialize the moving marker for the drone
+        drone.point_marker, = ax.plot([], [], [], drone.marker, color=drone.color, markersize=8, label=drone.label)
+
     if conflict_details and conflict_details.get("conflict"):
         loc = conflict_details["location"]
         ax.plot([loc["x"]], [loc["y"]], [loc["z"]], 'X', color='red', markersize=25, markeredgewidth=3, label="Conflict Point")
-        
-    # Set axis limits to make the plot more readable
-    all_x = px + [wp.x for f in simulated_flights for wp in f.waypoints]
-    all_y = py + [wp.y for f in simulated_flights for wp in f.waypoints]
-    all_z = pz + [wp.z for f in simulated_flights for wp in f.waypoints]
-    
-    # Set a buffer around the min/max points for better viewing
-    x_min, x_max = min(all_x) - 50, max(all_x) + 50
-    y_min, y_max = min(all_y) - 50, max(all_y) + 50
-    z_min, z_max = min(all_z), max(all_z) + 100 # More buffer for altitude
-    
-    ax.set_xlim([x_min, x_max])
-    ax.set_ylim([y_min, y_max])
-    ax.set_zlim([z_min, z_max])
 
-    # 5. Save the plot to a file
+    time_text = ax.text2D(0.05, 0.95, '', transform=ax.transAxes, fontsize=14)
     ax.legend()
+    
+    # Animation update function
+    def update(frame):
+        # frame goes from 0 to total_frames-1
+        current_time = (frame / total_frames) * (primary_mission.end_time)
+        
+        for drone in drones:
+            pos = drone.get_position(current_time)
+            if pos is not None:
+                drone.point_marker.set_data_3d([pos[0]], [pos[1]], [pos[2]])
+                drone.point_marker.set_visible(True)
+            else:
+                drone.point_marker.set_visible(False)
+        
+        time_text.set_text(f'Time: {current_time:.2f}s')
+        return [d.point_marker for d in drones] + [time_text]
+
+    # Set up animation
+    total_frames = duration_seconds * 15 # 15 fps
+    anim = FuncAnimation(fig, update, frames=total_frames, blit=True)
+
     if output_filename:
-        plt.savefig(output_filename)
-        print(f"3D Plot saved to '{output_filename}'")
+        print(f"Saving animation to '{output_filename}'... (this may take a moment)")
+        anim.save(output_filename, writer='pillow', fps=15)
+        print("Animation saved.")
     
     plt.close(fig)
-
-
-def create_2d_plot(
-    primary_mission: PrimaryMission, 
-    simulated_flights: List[SimulatedFlight], 
-    conflict_details: Optional[Dict[str, Any]] = None,
-    output_filename: Optional[str] = None
-):
-    """
-    Generates and saves a 2D plot of the airspace scenario (X-Y plane).
-
-    Args:
-        primary_mission: The primary drone's mission plan.
-        simulated_flights: A list of other drones' flight plans.
-        conflict_details: An optional dictionary containing conflict information.
-        output_filename: The path to save the generated plot image.
-    """
-    # 1. Set up the 2D plot canvas
-    fig, ax = plt.subplots(figsize=(12, 12))
-    ax.set_title("2D Airspace Visualization (Top-Down View)", fontsize=16)
-    ax.set_xlabel("X Coordinate (meters)", fontsize=12)
-    ax.set_ylabel("Y Coordinate (meters)", fontsize=12)
-    ax.grid(True, alpha=0.3)
-
-    # 2. Plot the primary mission's path
-    px = [wp.x for wp in primary_mission.waypoints]
-    py = [wp.y for wp in primary_mission.waypoints]
-    ax.plot(px, py, 'o-', color='blue', linewidth=2, markersize=8, label="Primary Mission")
-    ax.text(px[0], py[0], ' Start', color='blue', fontsize=10)
-
-    # 3. Plot the simulated flights' paths
-    for flight in simulated_flights:
-        sx = [wp.x for wp in flight.waypoints]
-        sy = [wp.y for wp in flight.waypoints]
-        ax.plot(sx, sy, 's--', color='gray', linewidth=1.5, markersize=6, label=f"Sim Flight: {flight.flight_id}")
-        ax.text(sx[0], sy[0], f' {flight.flight_id}', color='black', fontsize=9)
-
-    # 4. Highlight the conflict point if one exists
-    if conflict_details and conflict_details.get("conflict"):
-        loc = conflict_details["location"]
-        ax.plot([loc["x"]], [loc["y"]], 'X', color='red', markersize=25, markeredgewidth=3, label="Conflict Point")
-        
-    # Set axis limits to make the plot more readable
-    all_x = px + [wp.x for f in simulated_flights for wp in f.waypoints]
-    all_y = py + [wp.y for f in simulated_flights for wp in f.waypoints]
-    
-    # Set a buffer around the min/max points for better viewing
-    x_min, x_max = min(all_x) - 50, max(all_x) + 50
-    y_min, y_max = min(all_y) - 50, max(all_y) + 50
-    
-    ax.set_xlim([x_min, x_max])
-    ax.set_ylim([y_min, y_max])
-    ax.set_aspect('equal')
-
-    # 5. Save the plot to a file
-    ax.legend()
-    if output_filename:
-        plt.savefig(output_filename)
-        print(f"2D Plot saved to '{output_filename}'")
-    
-    plt.close(fig)
-
