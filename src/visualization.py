@@ -1,21 +1,84 @@
 """
 visualization.py
 
-This module provides functions to visualize the drone mission scenarios.
-For the 2D MVP, it generates a Matplotlib plot showing the paths of the
-primary mission and simulated flights, highlighting any detected conflicts.
-
-[CORRECTED VERSION] - Sets a non-interactive backend and saves plot to file.
+[V2 - 3D Enabled] This module provides functions to visualize the drone mission
+scenarios in 3D space.
 """
 import matplotlib
 # Set the backend to 'Agg' to prevent GUI-related errors.
-# This MUST be done before importing pyplot.
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 from typing import List, Dict, Any, Optional
 
 # Import our custom data models
 from .data_models import PrimaryMission, SimulatedFlight
+
+def create_3d_plot(
+    primary_mission: PrimaryMission, 
+    simulated_flights: List[SimulatedFlight], 
+    conflict_details: Optional[Dict[str, Any]] = None,
+    output_filename: Optional[str] = None
+):
+    """
+    Generates and saves a 3D plot of the airspace scenario.
+
+    Args:
+        primary_mission: The primary drone's mission plan.
+        simulated_flights: A list of other drones' flight plans.
+        conflict_details: An optional dictionary containing conflict information.
+        output_filename: The path to save the generated plot image.
+    """
+    # 1. Set up the 3D plot canvas
+    fig = plt.figure(figsize=(14, 14))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.set_title("3D Airspace Visualization", fontsize=16)
+    ax.set_xlabel("X Coordinate (meters)", fontsize=12)
+    ax.set_ylabel("Y Coordinate (meters)", fontsize=12)
+    ax.set_zlabel("Z Coordinate (Altitude in meters)", fontsize=12)
+
+    # 2. Plot the primary mission's path
+    px = [wp.x for wp in primary_mission.waypoints]
+    py = [wp.y for wp in primary_mission.waypoints]
+    pz = [wp.z for wp in primary_mission.waypoints]
+    ax.plot(px, py, pz, 'o-', color='blue', linewidth=2, markersize=8, label="Primary Mission")
+    ax.text(px[0], py[0], pz[0], ' Start', color='blue', fontsize=10)
+
+    # 3. Plot the simulated flights' paths
+    for flight in simulated_flights:
+        sx = [wp.x for wp in flight.waypoints]
+        sy = [wp.y for wp in flight.waypoints]
+        sz = [wp.z for wp in flight.waypoints]
+        ax.plot(sx, sy, sz, 's--', color='gray', linewidth=1.5, markersize=6, label=f"Sim Flight: {flight.flight_id}")
+        ax.text(sx[0], sy[0], sz[0], f' {flight.flight_id}', color='black', fontsize=9)
+
+    # 4. Highlight the conflict point if one exists
+    if conflict_details and conflict_details.get("conflict"):
+        loc = conflict_details["location"]
+        ax.plot([loc["x"]], [loc["y"]], [loc["z"]], 'X', color='red', markersize=25, markeredgewidth=3, label="Conflict Point")
+        
+    # Set axis limits to make the plot more readable
+    all_x = px + [wp.x for f in simulated_flights for wp in f.waypoints]
+    all_y = py + [wp.y for f in simulated_flights for wp in f.waypoints]
+    all_z = pz + [wp.z for f in simulated_flights for wp in f.waypoints]
+    
+    # Set a buffer around the min/max points for better viewing
+    x_min, x_max = min(all_x) - 50, max(all_x) + 50
+    y_min, y_max = min(all_y) - 50, max(all_y) + 50
+    z_min, z_max = min(all_z), max(all_z) + 100 # More buffer for altitude
+    
+    ax.set_xlim([x_min, x_max])
+    ax.set_ylim([y_min, y_max])
+    ax.set_zlim([z_min, z_max])
+
+    # 5. Save the plot to a file
+    ax.legend()
+    if output_filename:
+        plt.savefig(output_filename)
+        print(f"3D Plot saved to '{output_filename}'")
+    
+    plt.close(fig)
+
 
 def create_2d_plot(
     primary_mission: PrimaryMission, 
@@ -24,60 +87,56 @@ def create_2d_plot(
     output_filename: Optional[str] = None
 ):
     """
-    Generates and saves a 2D plot of the airspace scenario.
+    Generates and saves a 2D plot of the airspace scenario (X-Y plane).
 
     Args:
         primary_mission: The primary drone's mission plan.
         simulated_flights: A list of other drones' flight plans.
         conflict_details: An optional dictionary containing conflict information.
-                          If provided and a conflict exists, it will be highlighted.
-        output_filename: The path to save the generated plot image. If None,
-                         the plot is not saved.
+        output_filename: The path to save the generated plot image.
     """
-    # 1. Set up the plot canvas
+    # 1. Set up the 2D plot canvas
     fig, ax = plt.subplots(figsize=(12, 12))
-    ax.set_title("2D Airspace Visualization", fontsize=16)
+    ax.set_title("2D Airspace Visualization (Top-Down View)", fontsize=16)
     ax.set_xlabel("X Coordinate (meters)", fontsize=12)
     ax.set_ylabel("Y Coordinate (meters)", fontsize=12)
-    ax.set_aspect('equal', adjustable='box') # Ensures correct spatial representation
-    ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+    ax.grid(True, alpha=0.3)
 
     # 2. Plot the primary mission's path
-    primary_x = [wp.x for wp in primary_mission.waypoints]
-    primary_y = [wp.y for wp in primary_mission.waypoints]
-    ax.plot(primary_x, primary_y, 'o-', color='blue', linewidth=2, markersize=8, label="Primary Mission")
-    ax.text(primary_x[0], primary_y[0], ' Start', color='blue', fontsize=10, verticalalignment='bottom')
+    px = [wp.x for wp in primary_mission.waypoints]
+    py = [wp.y for wp in primary_mission.waypoints]
+    ax.plot(px, py, 'o-', color='blue', linewidth=2, markersize=8, label="Primary Mission")
+    ax.text(px[0], py[0], ' Start', color='blue', fontsize=10)
 
     # 3. Plot the simulated flights' paths
     for flight in simulated_flights:
-        sim_x = [wp.x for wp in flight.waypoints]
-        sim_y = [wp.y for wp in flight.waypoints]
-        ax.plot(sim_x, sim_y, 's--', color='gray', linewidth=1.5, markersize=6, label=f"Sim Flight: {flight.flight_id}")
-        ax.text(sim_x[0], sim_y[0], f' {flight.flight_id}', color='black', fontsize=9, verticalalignment='bottom')
+        sx = [wp.x for wp in flight.waypoints]
+        sy = [wp.y for wp in flight.waypoints]
+        ax.plot(sx, sy, 's--', color='gray', linewidth=1.5, markersize=6, label=f"Sim Flight: {flight.flight_id}")
+        ax.text(sx[0], sy[0], f' {flight.flight_id}', color='black', fontsize=9)
 
     # 4. Highlight the conflict point if one exists
     if conflict_details and conflict_details.get("conflict"):
         loc = conflict_details["location"]
-        ax.plot(loc["x"], loc["y"], 'X', color='red', markersize=25, markeredgewidth=3, label="Conflict Point")
+        ax.plot([loc["x"]], [loc["y"]], 'X', color='red', markersize=25, markeredgewidth=3, label="Conflict Point")
         
-        # Add an annotation for clarity
-        conflict_text = f"Conflict with {conflict_details['flight_id']}"
-        ax.annotate(
-            conflict_text,
-            xy=(loc["x"], loc["y"]),
-            xytext=(loc["x"] + 50, loc["y"] + 50), # Offset the text
-            textcoords='offset points',
-            arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=.2", color='red'),
-            bbox=dict(boxstyle="round,pad=0.5", fc="yellow", ec="black", lw=1, alpha=0.8),
-            fontsize=10,
-            color='black'
-        )
+    # Set axis limits to make the plot more readable
+    all_x = px + [wp.x for f in simulated_flights for wp in f.waypoints]
+    all_y = py + [wp.y for f in simulated_flights for wp in f.waypoints]
+    
+    # Set a buffer around the min/max points for better viewing
+    x_min, x_max = min(all_x) - 50, max(all_x) + 50
+    y_min, y_max = min(all_y) - 50, max(all_y) + 50
+    
+    ax.set_xlim([x_min, x_max])
+    ax.set_ylim([y_min, y_max])
+    ax.set_aspect('equal')
 
-    # 5. Save the plot to a file if a filename is provided
+    # 5. Save the plot to a file
     ax.legend()
     if output_filename:
         plt.savefig(output_filename)
-        print(f"Plot saved to '{output_filename}'")
+        print(f"2D Plot saved to '{output_filename}'")
     
-    # Close the figure to free up memory and prevent it from trying to render
     plt.close(fig)
+
