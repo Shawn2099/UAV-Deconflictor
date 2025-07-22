@@ -1,9 +1,9 @@
 """
 visualization.py
 
-[V3 - 4D Animation Enabled] This module provides functions to visualize the
-drone mission scenarios in 3D space and creates an animated GIF to show the
-spatio-temporal evolution of the flights.
+[V4.1 - Corrected Import] This module provides functions to visualize the
+drone mission scenarios in 3D space. It creates an animated GIF and marks the
+conflict zone with a transparent red circle for better visibility.
 """
 import matplotlib
 # Set the backend to 'Agg' to prevent GUI-related errors.
@@ -15,6 +15,7 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 
 # Import our custom data models
+# CORRECTED LINE: Added 'Waypoint' to the import statement
 from .data_models import PrimaryMission, SimulatedFlight, Waypoint
 
 class DynamicDrone:
@@ -30,7 +31,7 @@ class DynamicDrone:
 
     def get_position(self, time: float) -> Optional[np.ndarray]:
         """Calculates the drone's 3D position at a specific time."""
-        if time < self.timestamps[0] or time > self.timestamps[-1]:
+        if not self.timestamps or time < self.timestamps[0] or time > self.timestamps[-1]:
             return None # Drone is not active
 
         for i in range(len(self.timestamps) - 1):
@@ -39,11 +40,9 @@ class DynamicDrone:
                 p1 = np.array([self.waypoints[i].x, self.waypoints[i].y, self.waypoints[i].z])
                 p2 = np.array([self.waypoints[i+1].x, self.waypoints[i+1].y, self.waypoints[i+1].z])
                 
-                # Handle cases where a drone hovers (t1 == t2)
-                if t1 == t2:
+                if t1 == t2: # Handle case where a drone hovers
                     return p1
                 
-                # Calculate progress along the segment
                 progress = (time - t1) / (t2 - t1)
                 return p1 + progress * (p2 - p1)
         return None
@@ -54,7 +53,7 @@ def create_4d_animation(
     primary_mission_etas: List[float],
     conflict_details: Optional[Dict[str, Any]] = None,
     output_filename: Optional[str] = None,
-    duration_seconds: int = 10
+    duration_seconds: int = 15 # Increased default duration for complex scenarios
 ):
     """
     Generates and saves a 4D (3D + time) animation of the airspace scenario.
@@ -67,9 +66,7 @@ def create_4d_animation(
     ax.set_zlabel("Z Coordinate (Altitude in meters)")
 
     drones = []
-    # Add primary mission drone
     drones.append(DynamicDrone(primary_mission.waypoints, primary_mission_etas, 'blue', 'o', 'Primary Mission'))
-    # Add simulated drones
     for flight in simulated_flights:
         drones.append(DynamicDrone(flight.waypoints, flight.timestamps, 'gray', 's', f'Sim Flight: {flight.flight_id}'))
 
@@ -78,22 +75,37 @@ def create_4d_animation(
         x = [wp.x for wp in drone.waypoints]
         y = [wp.y for wp in drone.waypoints]
         z = [wp.z for wp in drone.waypoints]
-        # Plot the full path as a faint dashed line
         drone.path_line, = ax.plot(x, y, z, '--', color=drone.color, linewidth=1, alpha=0.5)
-        # Initialize the moving marker for the drone
         drone.point_marker, = ax.plot([], [], [], drone.marker, color=drone.color, markersize=8, label=drone.label)
 
+    # Highlight the conflict zone with a transparent circle
     if conflict_details and conflict_details.get("conflict"):
         loc = conflict_details["location"]
-        ax.plot([loc["x"]], [loc["y"]], [loc["z"]], 'X', color='red', markersize=25, markeredgewidth=3, label="Conflict Point")
+        ax.plot(
+            [loc["x"]], [loc["y"]], [loc["z"]],
+            marker='o',
+            markersize=35,
+            markerfacecolor='none',      # Make the center transparent
+            markeredgecolor='red',       # Keep the edge red
+            markeredgewidth=3,           # Make the edge thick and visible
+            label="Conflict Zone"
+        )
 
     time_text = ax.text2D(0.05, 0.95, '', transform=ax.transAxes, fontsize=14)
-    ax.legend()
     
+    # Filter out duplicate labels for a cleaner legend
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys())
+    
+    # Determine the total simulation time based on the last event of any drone
+    all_end_times = [d.timestamps[-1] for d in drones if d.timestamps]
+    max_time = max(all_end_times) if all_end_times else 0
+
     # Animation update function
     def update(frame):
-        # frame goes from 0 to total_frames-1
-        current_time = (frame / total_frames) * (primary_mission.end_time)
+        total_frames = duration_seconds * 15 # 15 fps
+        current_time = (frame / total_frames) * max_time if max_time > 0 else 0
         
         for drone in drones:
             pos = drone.get_position(current_time)
@@ -106,8 +118,7 @@ def create_4d_animation(
         time_text.set_text(f'Time: {current_time:.2f}s')
         return [d.point_marker for d in drones] + [time_text]
 
-    # Set up animation
-    total_frames = duration_seconds * 15 # 15 fps
+    total_frames = duration_seconds * 15
     anim = FuncAnimation(fig, update, frames=total_frames, blit=True)
 
     if output_filename:
