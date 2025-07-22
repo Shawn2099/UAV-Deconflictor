@@ -5,8 +5,9 @@ This is the main entry point for the UAV Strategic Deconfliction application.
 It sets up different mission scenarios, runs the deconfliction checks,
 and generates visualizations of the outcomes.
 
-[V4.2 - Animation Enabled] - Calls the new 4D animation function and
-calculates the necessary timing data for it.
+[V6 - Showcase Scenario] - A highly complex, deterministic scenario designed
+to be a definitive showcase of the system's capabilities. Features intricate
+flight paths and multiple, clearly identifiable conflict points.
 """
 
 import numpy as np
@@ -14,7 +15,6 @@ import math
 # Import the necessary functions and classes from our 'src' package
 from src.data_models import Waypoint, PrimaryMission, SimulatedFlight
 from src.deconfliction_logic import check_mission_conflicts 
-# Import the new 4D animation function
 from src.visualization import create_4d_animation 
 
 def run_3d_scenario(scenario_name: str, primary_mission: PrimaryMission, simulated_flights: list, safety_buffer: float):
@@ -27,8 +27,6 @@ def run_3d_scenario(scenario_name: str, primary_mission: PrimaryMission, simulat
     conflict_result = check_mission_conflicts(primary_mission, simulated_flights, safety_buffer)
     
     # --- Calculate Primary Mission ETAs for Visualization ---
-    # This logic is duplicated from the deconfliction engine, but is necessary
-    # to pass the timing data to the animation function.
     total_dist = sum(
         np.linalg.norm(np.array([p2.x, p2.y, p2.z]) - np.array([p1.x, p1.y, p1.z]))
         for p1, p2 in zip(primary_mission.waypoints, primary_mission.waypoints[1:])
@@ -57,7 +55,7 @@ def run_3d_scenario(scenario_name: str, primary_mission: PrimaryMission, simulat
         print("Mission is Clear. No conflicts detected.")
         
     # Generate and save the 4D animation to a file
-    output_filename = f"{scenario_name.replace(' ', '_').lower()}.gif" # Save as .gif
+    output_filename = f"{scenario_name.replace(' ', '_').lower()}.gif"
     create_4d_animation(primary_mission, simulated_flights, primary_etas, conflict_result, output_filename)
 
 
@@ -65,34 +63,67 @@ if __name__ == "__main__":
     # Define a constant safety buffer for all scenarios
     SAFETY_BUFFER = 50.0  # 50 meters
 
-    # --- SCENARIO 5: Complex 3D Airspace ---
-    primary_mission_5 = PrimaryMission(
+    # --- SHOWCASE SCENARIO: The Final, Complex Test ---
+    # Primary mission flies a complex "Clover" pattern with altitude changes.
+    primary_mission_showcase = PrimaryMission(
         waypoints=[
-            Waypoint(x=200, y=200, z=100),
-            Waypoint(x=800, y=200, z=100),
-            Waypoint(x=800, y=800, z=100),
-            Waypoint(x=200, y=800, z=100),
-            Waypoint(x=200, y=200, z=100) # Return to start
+            Waypoint(x=500, y=500, z=100),
+            Waypoint(x=300, y=700, z=125),
+            Waypoint(x=500, y=500, z=150), # Return to center, higher
+            Waypoint(x=700, y=700, z=175),
+            Waypoint(x=500, y=500, z=200), # Return to center, higher
+            Waypoint(x=700, y=300, z=225),
+            Waypoint(x=500, y=500, z=250), # Return to center, higher
+            Waypoint(x=300, y=300, z=275),
+            Waypoint(x=500, y=500, z=300), # Final point
         ],
         start_time=0,
-        end_time=400 # 400 seconds for the mission
+        end_time=800 
     )
 
-    simulated_flights_5 = [
-        SimulatedFlight("SF-C1", [Waypoint(0, 500, 300), Waypoint(1000, 500, 300)], [0, 200]),
-        SimulatedFlight("SF-C2", [Waypoint(500, 0, 20), Waypoint(500, 1000, 20)], [0, 200]),
-        SimulatedFlight("SF-C3", [Waypoint(0, 0, 100), Waypoint(1000, 1000, 100)], [450, 600]),
-        SimulatedFlight("SF-C4", [Waypoint(950, 950, 50), Waypoint(960, 960, 50)], [0, 400]),
-        SimulatedFlight("SF-C5", [Waypoint(0,0,80), Waypoint(100,100,80), Waypoint(0,200,80)], [10, 50, 100]),
-        SimulatedFlight("SF-C6", [Waypoint(50,50,10), Waypoint(50,50,400)], [10, 100]),
-        SimulatedFlight("SF-C7", [Waypoint(200, 150, 160), Waypoint(800, 150, 160)], [0, 100]),
-        SimulatedFlight("SF-C8", [Waypoint(850, 200, 100), Waypoint(850, 800, 100)], [250, 350]),
-        SimulatedFlight("SF-C9", [Waypoint(100, 900, 150), Waypoint(200, 900, 150)], [0, 100]),
+    simulated_flights_showcase = [
+        # CONFLICT DRONE 1: Ascends vertically through the center hub of the clover.
+        # This will conflict with the primary mission multiple times, but the first
+        # conflict should be detected on the first return to center.
         SimulatedFlight(
-            flight_id="SF-CONFLICT",
-            waypoints=[Waypoint(x=500, y=200, z=50), Waypoint(x=500, y=200, z=150)],
-            timestamps=[40, 80] 
-        )
+            "CONFLICT-VERTICAL", 
+            [Waypoint(500, 500, 50), Waypoint(500, 500, 400)], 
+            [180, 280] # Timed to conflict with the primary's return to center at t=200
+        ),
+
+        # SURVEY DRONE: Flies a "lawnmower" grid pattern at a low, safe altitude.
+        SimulatedFlight("SURVEY-DRONE", [
+            Waypoint(100, 100, 50), Waypoint(900, 100, 50),
+            Waypoint(900, 200, 50), Waypoint(100, 200, 50),
+            Waypoint(100, 300, 50), Waypoint(900, 300, 50),
+        ], [0, 80, 90, 170, 180, 260]),
+
+        # INSPECTION DRONE: Flies a helical (corkscrew) path upwards around a point of interest.
+        SimulatedFlight("INSPECTION-DRONE", [
+            Waypoint(100, 800, 100), Waypoint(150, 850, 120),
+            Waypoint(100, 900, 140), Waypoint(50, 850, 160),
+            Waypoint(100, 800, 180), Waypoint(150, 850, 200),
+        ], [300, 320, 340, 360, 380, 400]),
+
+        # PERIMETER DRONE: Patrols the outer edges of the airspace.
+        SimulatedFlight("PERIMETER-DRONE", [
+            Waypoint(0, 0, 200), Waypoint(1000, 0, 200),
+            Waypoint(1000, 1000, 200), Waypoint(0, 1000, 200),
+            Waypoint(0, 0, 200),
+        ], [0, 200, 400, 600, 800]),
+
+        # CONFLICT DRONE 2: High-speed transit drone that cuts across the final leaf of the clover.
+        # This conflict will likely not be reported because the vertical conflict happens first.
+        SimulatedFlight(
+            "CONFLICT-TRANSIT", 
+            [Waypoint(0, 300, 275), Waypoint(1000, 300, 275)], 
+            [650, 750] # Timed to conflict with the primary's last leg
+        ),
+        
+        # LOITERING DRONE: Hovers at a waypoint for an extended period.
+        SimulatedFlight("LOITER-DRONE", [
+            Waypoint(800, 800, 400), Waypoint(800, 800, 400)
+        ], [100, 500]), # Stays in one spot from t=100 to t=500
     ]
     
-    run_3d_scenario("Complex 3D Airspace", primary_mission_5, simulated_flights_5, SAFETY_BUFFER)
+    run_3d_scenario("Showcase Scenario", primary_mission_showcase, simulated_flights_showcase, SAFETY_BUFFER)
