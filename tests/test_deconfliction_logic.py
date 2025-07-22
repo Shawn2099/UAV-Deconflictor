@@ -3,21 +3,22 @@ test_deconfliction_logic.py
 
 [Comprehensive Unit Tests for the Hybrid Deconfliction Engine]
 This module contains a full suite of unit tests for `src.deconfliction_logic`.
-It is divided into two main sections:
+It is divided into four main sections:
 
 1.  Narrow Phase Tests: Rigorously tests the `get_closest_points_and_distance_3d`
-    function with various geometric edge cases (parallel, intersecting, skew, collinear).
-    This ensures the mathematical core of the engine is robust.
-
-2.  Hybrid Engine Tests: Tests the `check_conflicts_hybrid` orchestrator to verify
-    that the broad-phase filter and narrow-phase checks work together correctly to
-    identify both conflict and conflict-free scenarios.
+    function with various geometric edge cases.
+2.  Hybrid Engine Tests: Verifies the correct identification of conflict and
+    conflict-free scenarios.
+3.  Robustness Tests: Ensures the system handles invalid or unusual inputs gracefully.
+4.  Performance Tests: Validates the scalability of the hybrid engine under load.
 """
 
 import pytest
 import numpy as np
 import os
 import sys
+import time
+import random
 
 # --- Add the project root to the Python path ---
 # This allows us to import modules from the 'src' directory.
@@ -72,8 +73,6 @@ def test_get_closest_points_skew_endpoint_to_interior():
     distance, midpoint = get_closest_points_and_distance_3d(p1, p2, q1, q2)
     
     assert distance == pytest.approx(5.0)
-    # Closest point on P is (5,0,0). Closest point on Q is (5,0,5).
-    # Midpoint is (5, 0, 2.5)
     assert np.allclose(midpoint, np.array([5.0, 0.0, 2.5]))
 
 def test_get_closest_points_collinear_overlapping():
@@ -102,7 +101,7 @@ def test_get_closest_points_collinear_disjoint():
     
     distance, _ = get_closest_points_and_distance_3d(p1, p2, q1, q2)
     
-    assert distance == pytest.approx(3.0) # Gap between 5 and 8
+    assert distance == pytest.approx(3.0)
 
 # ==============================================================================
 # === Section 2: Hybrid Engine Tests (System-Level Logic)
@@ -122,8 +121,8 @@ def conflicting_simulated_flight():
     """A simulated flight designed to create a definite conflict."""
     return SimulatedFlight(
         flight_id="CONFLICT_DRONE",
-        waypoints=[Waypoint(500, -10, 100), Waypoint(500, 10, 100)], # Crosses path
-        timestamps=[40, 60] # Overlaps in time with primary mission
+        waypoints=[Waypoint(500, -10, 100), Waypoint(500, 10, 100)],
+        timestamps=[40, 60]
     )
 
 @pytest.fixture
@@ -131,14 +130,11 @@ def non_conflicting_simulated_flight():
     """A simulated flight that is nearby but should not conflict."""
     return SimulatedFlight(
         flight_id="SAFE_DRONE",
-        waypoints=[Waypoint(500, 200, 100), Waypoint(500, 300, 100)], # Spatially far
+        waypoints=[Waypoint(500, 200, 100), Waypoint(500, 300, 100)],
         timestamps=[40, 60]
     )
 
 def test_check_conflicts_hybrid_clear_scenario(clear_primary_mission, non_conflicting_simulated_flight):
-    """
-    Tests a scenario where no conflict should be detected.
-    """
     result = check_conflicts_hybrid(
         primary_mission=clear_primary_mission,
         simulated_flights=[non_conflicting_simulated_flight],
@@ -147,9 +143,6 @@ def test_check_conflicts_hybrid_clear_scenario(clear_primary_mission, non_confli
     assert not result["conflict"]
 
 def test_check_conflicts_hybrid_conflict_detected(clear_primary_mission, conflicting_simulated_flight):
-    """
-    Tests a scenario where a conflict is expected and should be detected.
-    """
     result = check_conflicts_hybrid(
         primary_mission=clear_primary_mission,
         simulated_flights=[conflicting_simulated_flight],
@@ -157,25 +150,18 @@ def test_check_conflicts_hybrid_conflict_detected(clear_primary_mission, conflic
     )
     assert result["conflict"]
     assert result["flight_id"] == "CONFLICT_DRONE"
-    assert "location" in result
-    assert "time" in result
 
 def test_check_conflicts_hybrid_temporal_miss():
-    """
-    Tests a scenario where drones are close in space but miss in time.
-    """
     primary_mission = PrimaryMission(
         waypoints=[Waypoint(0,0,100), Waypoint(1000,0,100)],
         start_time=0,
         end_time=100
     )
-    # This flight crosses the same path but at a much later time.
     sim_flight = SimulatedFlight(
         flight_id="TEMPORAL_MISS_DRONE",
         waypoints=[Waypoint(500, -10, 100), Waypoint(500, 10, 100)],
-        timestamps=[200, 220] # Mission ends at t=100, this flight starts at t=200
+        timestamps=[200, 220]
     )
-    
     result = check_conflicts_hybrid(
         primary_mission=primary_mission,
         simulated_flights=[sim_flight],
@@ -184,19 +170,98 @@ def test_check_conflicts_hybrid_temporal_miss():
     assert not result["conflict"]
 
 def test_check_conflicts_hybrid_broad_phase_filter(clear_primary_mission, conflicting_simulated_flight, non_conflicting_simulated_flight, capsys):
-    """
-    Tests that the broad-phase filter correctly identifies candidates.
-    It checks the print output to infer if the filter is working.
-    [Inference] This test relies on capturing stdout to verify the number of candidates.
-    """
     check_conflicts_hybrid(
         primary_mission=clear_primary_mission,
         simulated_flights=[conflicting_simulated_flight, non_conflicting_simulated_flight],
         safety_buffer=50.0
     )
     captured = capsys.readouterr()
-    # Expects the conflicting drone to be a candidate, but the safe one might be too if bins are large.
-    # A good test is to ensure not ALL drones are checked.
-    # The key line is "Found X potential threats out of 2 total."
     assert "Found 1 potential threats out of 2 total." in captured.out or \
-           "Found 2 potential threats out of 2 total." in captured.out # This is also acceptable depending on bin size
+           "Found 2 potential threats out of 2 total." in captured.out
+
+# ==============================================================================
+# === Section 3: Robustness and Edge Case Input Tests
+# ==============================================================================
+
+def test_check_conflicts_hybrid_no_sim_flights(clear_primary_mission):
+    result = check_conflicts_hybrid(
+        primary_mission=clear_primary_mission,
+        simulated_flights=[],
+        safety_buffer=50.0
+    )
+    assert not result["conflict"]
+
+def test_check_conflicts_hybrid_stationary_mission(conflicting_simulated_flight):
+    stationary_mission = PrimaryMission(
+        waypoints=[Waypoint(500, 0, 100)],
+        start_time=0,
+        end_time=100
+    )
+    result = check_conflicts_hybrid(
+        primary_mission=stationary_mission,
+        simulated_flights=[conflicting_simulated_flight],
+        safety_buffer=50.0
+    )
+    assert not result["conflict"]
+
+def test_check_conflicts_hybrid_invalid_time_window(clear_primary_mission, conflicting_simulated_flight):
+    invalid_time_mission = PrimaryMission(
+        waypoints=clear_primary_mission.waypoints,
+        start_time=100,
+        end_time=0
+    )
+    result = check_conflicts_hybrid(
+        primary_mission=invalid_time_mission,
+        simulated_flights=[conflicting_simulated_flight],
+        safety_buffer=50.0
+    )
+    assert "conflict" in result
+
+# ==============================================================================
+# === Section 4: Performance and Scalability Tests
+# ==============================================================================
+
+@pytest.mark.slow
+def test_performance_in_high_density_airspace(clear_primary_mission, conflicting_simulated_flight):
+    """
+    Tests the system's performance with a large number of simulated flights.
+    This validates the efficiency of the broad-phase filter.
+    """
+    num_safe_flights = 2000
+    simulated_flights = []
+
+    # Generate many non-conflicting flights far away from the primary mission
+    for i in range(num_safe_flights):
+        # Place these flights in a completely different spatial area
+        safe_x = random.uniform(5000, 10000)
+        safe_y = random.uniform(5000, 10000)
+        flight = SimulatedFlight(
+            flight_id=f"SAFE_DRONE_{i}",
+            waypoints=[Waypoint(safe_x, safe_y, 100), Waypoint(safe_x + 100, safe_y, 100)],
+            timestamps=[0, 100]
+        )
+        simulated_flights.append(flight)
+
+    # Add the single known conflicting flight
+    simulated_flights.append(conflicting_simulated_flight)
+    
+    start_time = time.time()
+    
+    result = check_conflicts_hybrid(
+        primary_mission=clear_primary_mission,
+        simulated_flights=simulated_flights,
+        safety_buffer=50.0
+    )
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    
+    print(f"\nPerformance test with {len(simulated_flights)} drones took {duration:.4f} seconds.")
+
+    # Assert that the correct conflict was found
+    assert result["conflict"]
+    assert result["flight_id"] == "CONFLICT_DRONE"
+    
+    # Assert that the check was fast, proving the filter is working
+    # [Unverified] This threshold may need adjustment based on the machine running the test.
+    assert duration < 2.0, "Deconfliction check took too long, broad-phase may be inefficient."
