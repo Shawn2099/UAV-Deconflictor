@@ -1,0 +1,11 @@
+{
+    "deconfliction_parameters": {
+        "safety_buffer_m": 50.0,
+        "grid_bin_size": {
+            "x_m": 100.0,
+            "y_m": 100.0,
+            "z_m": 100.0,
+            "t_s": 10.0
+        }
+    }
+}
