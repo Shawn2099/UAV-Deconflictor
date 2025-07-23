@@ -1,13 +1,10 @@
 """
 server.py
 
-[V7 - Added Stop Control]
+[V8 - User-Defined Safety Buffer]
 This script creates a real-time, stateful web server using Flask and Flask-SocketIO.
-It runs a continuous simulation loop, broadcasting the state of all drones
-to connected clients via WebSockets, creating a live ATC-style experience.
-
-This version adds a 'stop_simulation' handler to gracefully stop the background
-simulation thread.
+It now accepts a user-defined safety buffer from the front-end for more
+dynamic deconfliction checks.
 """
 
 import time
@@ -124,8 +121,17 @@ def check_conflicts_endpoint():
         drone_model = data.get("drone_model", "DJI_Mavic_4_Pro")
         drone_speed = CONFIG_DATA["drone_performance_profiles"][drone_model]["speed_mps"]
         
+        # --- NEW: Get safety buffer from user, with validation ---
+        safety_buffer = data.get("safety_buffer", 50.0)
+        if not isinstance(safety_buffer, (int, float)) or safety_buffer < 25:
+            return jsonify({"error": "Invalid safety buffer. Must be a number and at least 25."}), 400
+
+        # Create a temporary config for this specific check
+        deconfliction_params = CONFIG_DATA["deconfliction_parameters"].copy()
+        deconfliction_params["safety_buffer_m"] = safety_buffer
+        
         result = check_conflicts_hybrid(
-            primary_mission, SIMULATED_FLIGHTS_OBJECTS, drone_speed, CONFIG_DATA["deconfliction_parameters"]
+            primary_mission, SIMULATED_FLIGHTS_OBJECTS, drone_speed, deconfliction_params
         )
         return jsonify(result)
     except (ValueError, KeyError, TypeError) as e:
@@ -160,4 +166,3 @@ def handle_stop_simulation():
 if __name__ == '__main__':
     print("Starting UAV Live Simulation Server at http://127.0.0.1:5000")
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, use_reloader=False)
-

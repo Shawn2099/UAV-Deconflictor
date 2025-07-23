@@ -36,6 +36,8 @@
             backdrop-filter: blur(2px);
             border: 1px solid rgba(0,0,0,0.1);
         }
+        /* Input validation style */
+        .input-error { border-color: #ef4444 !important; }
     </style>
 </head>
 <body id="body-container" class="bg-gray-200 text-gray-800 flex flex-col md:flex-row h-screen overflow-hidden">
@@ -69,8 +71,8 @@
                 </div>
             </div>
             <div class="flex space-x-2 mt-4">
-                <button id="start-sim-btn" class="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-sm transition-all">Start</button>
-                <button id="stop-sim-btn" class="flex-1 py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-sm transition-all">Stop</button>
+                <button id="start-sim-btn" class="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-sm transition-all disabled:bg-gray-400" disabled>Start</button>
+                <button id="stop-sim-btn" class="flex-1 py-2 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-sm transition-all disabled:bg-gray-400" disabled>Stop</button>
             </div>
             <div class="mt-2">
                  <button id="connect-btn" class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-sm transition-all hidden">Connect</button>
@@ -95,10 +97,16 @@
                 <div>
                     <label for="mission-start-time" class="block text-sm font-medium text-gray-700">Mission Start Time (s)</label>
                     <input type="number" id="mission-start-time" value="0" class="mt-1 block w-full bg-white border-gray-300 rounded-md shadow-sm py-2 px-3">
+                    <p id="time-error" class="text-xs text-red-500 mt-1 hidden">End time must be after start time.</p>
                 </div>
                 <div>
                     <label for="mission-end-time" class="block text-sm font-medium text-gray-700">Mission End Time (s)</label>
                     <input type="number" id="mission-end-time" value="300" class="mt-1 block w-full bg-white border-gray-300 rounded-md shadow-sm py-2 px-3">
+                </div>
+                <div>
+                    <label for="safety-buffer" class="block text-sm font-medium text-gray-700">Safety Buffer (m)</label>
+                    <input type="number" id="safety-buffer" value="50" min="25" class="mt-1 block w-full bg-white border-gray-300 rounded-md shadow-sm py-2 px-3">
+                    <p id="buffer-error" class="text-xs text-red-500 mt-1 hidden">Minimum safety buffer is 25m.</p>
                 </div>
                 <div>
                     <label for="drone-model" class="block text-sm font-medium text-gray-700">Drone Model</label>
@@ -111,7 +119,7 @@
                     <span id="waypoint-count" class="text-sm text-gray-600">0 Waypoints</span>
                     <button id="reset-mission-btn" class="px-3 py-1 bg-gray-700 hover:bg-gray-800 text-white rounded-md text-xs font-medium">Reset</button>
                 </div>
-                <button id="check-airspace-btn" class="w-full mt-auto py-3 px-4 bg-blue-800 hover:bg-blue-900 text-white text-lg font-bold rounded-lg shadow-md">Check Airspace</button>
+                <button id="check-airspace-btn" class="w-full mt-auto py-3 px-4 bg-blue-800 hover:bg-blue-900 text-white text-lg font-bold rounded-lg shadow-md disabled:bg-gray-400" disabled>Check Airspace</button>
             </div>
         </div>
         
@@ -153,7 +161,6 @@
             let worldBounds = { size: 400, altitude: 500 };
             let primaryDrone = null;
             let currentSimTime = 0;
-            let staticPathsGroup = new THREE.Group();
 
             // --- THREE.JS SETUP ---
             const scene = new THREE.Scene();
@@ -182,7 +189,6 @@
             const droneObjects = {};
             const waypointMarkers = new THREE.Group();
             scene.add(waypointMarkers);
-            scene.add(staticPathsGroup);
             let plannedPathLine = null;
             let conflictSphere = null;
             
@@ -224,10 +230,23 @@
                 
                 if (primaryDrone) {
                     const pos = getPositionOnPath(primaryDrone.waypoints, primaryDrone.etas, currentSimTime);
+                    primaryDrone.mesh.visible = !!pos;
                     if (pos) {
                         primaryDrone.mesh.position.set(pos.x, pos.z, pos.y);
                     }
                 }
+
+                Object.values(droneObjects).forEach(drone => {
+                    const isVisible = (currentSimTime >= drone.timestamps[0] && currentSimTime <= drone.timestamps[drone.timestamps.length - 1]);
+                    drone.mesh.visible = isVisible;
+                    drone.path.visible = isVisible;
+                    if (isVisible) {
+                        const pos = getPositionOnPath(drone.waypoints, drone.timestamps, currentSimTime);
+                        if(pos) {
+                           drone.mesh.position.set(pos.x, pos.z, pos.y);
+                        }
+                    }
+                });
 
                 controls.update();
                 renderer.render(scene, camera);
@@ -245,18 +264,6 @@
             onWindowResize();
 
             // --- DRAWING & HELPER FUNCTIONS ---
-            function drawStaticPaths() {
-                while(staticPathsGroup.children.length > 0) staticPathsGroup.remove(staticPathsGroup.children[0]);
-                simulatedFlightsData.forEach(flight => {
-                    const points = flight.waypoints.map(wp => new THREE.Vector3(wp.x, wp.z, wp.y));
-                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                    const material = new THREE.LineDashedMaterial({ color: 0xffa500, dashSize: 5, gapSize: 5 });
-                    const line = new THREE.Line(geometry, material);
-                    line.computeLineDistances();
-                    staticPathsGroup.add(line);
-                });
-            }
-            
             function drawPlannedPath() {
                 if (plannedPathLine) scene.remove(plannedPathLine);
                 if (primaryWaypoints.length < 2) return;
@@ -283,8 +290,8 @@
                 if (conflictSphere) scene.remove(conflictSphere);
                 if (conflictResult && conflictResult.status === 'CONFLICT') {
                     const loc = conflictResult.location;
-                    const geometry = new THREE.SphereGeometry(10, 32, 32);
-                    const material = new THREE.MeshBasicMaterial({ color: 0xfc3d21, transparent: true, opacity: 0.5 });
+                    const geometry = new THREE.SphereGeometry(conflictResult.safety_buffer || 10, 32, 32);
+                    const material = new THREE.MeshBasicMaterial({ color: 0xfc3d21, transparent: true, opacity: 0.4 });
                     conflictSphere = new THREE.Mesh(geometry, material);
                     conflictSphere.position.set(loc.x, loc.z, loc.y);
                     scene.add(conflictSphere);
@@ -326,20 +333,29 @@
             const activeDronesEl = document.getElementById('active-drones');
             const connectBtn = document.getElementById('connect-btn');
             const disconnectBtn = document.getElementById('disconnect-btn');
+            const startBtn = document.getElementById('start-sim-btn');
+            const stopBtn = document.getElementById('stop-sim-btn');
+            const checkAirspaceBtn = document.getElementById('check-airspace-btn');
+            const statusContentEl = document.getElementById('status-content');
             
             function resetSimUI() {
-                const startBtn = document.getElementById('start-sim-btn');
                 startBtn.textContent = "Start";
-                startBtn.disabled = false;
+                startBtn.disabled = !socket.connected;
                 startBtn.classList.add('bg-green-600', 'hover:bg-green-700');
-                startBtn.classList.remove('bg-gray-500', 'cursor-not-allowed');
+                startBtn.classList.remove('bg-gray-400');
+                stopBtn.disabled = true;
+                stopBtn.classList.add('bg-gray-400');
+                stopBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+
                 document.getElementById('sim-time').textContent = '0.00s';
                 activeDronesEl.textContent = '0';
                 simulationStatusEl.textContent = 'STOPPED';
                 simulationStatusEl.classList.remove('text-green-600');
                 simulationStatusEl.classList.add('text-gray-500');
-                Object.values(droneObjects).forEach(obj => scene.remove(obj));
-                for (const key in droneObjects) delete droneObjects[key];
+                Object.values(droneObjects).forEach(obj => {
+                    obj.mesh.visible = false;
+                    obj.path.visible = false;
+                });
             }
 
             socket.on('connect', () => {
@@ -349,6 +365,9 @@
                 connectionStatusEl.classList.add('text-green-600', 'bg-green-100');
                 connectBtn.classList.add('hidden');
                 disconnectBtn.classList.remove('hidden');
+                startBtn.disabled = false;
+                startBtn.classList.remove('bg-gray-400');
+                validateInputs(); // Re-validate to enable check button
                 fetchInitialData();
             });
             socket.on('disconnect', () => {
@@ -358,51 +377,41 @@
                 connectionStatusEl.classList.remove('text-green-600', 'bg-green-100');
                 disconnectBtn.classList.add('hidden');
                 connectBtn.classList.remove('hidden');
+                startBtn.disabled = true;
+                startBtn.classList.add('bg-gray-400');
+                stopBtn.disabled = true;
+                stopBtn.classList.add('bg-gray-400');
+                checkAirspaceBtn.disabled = true;
+                checkAirspaceBtn.classList.add('bg-gray-400');
+                statusContentEl.innerHTML = `<span class="font-bold text-lg text-gray-500">OFFLINE</span>`;
                 resetSimUI();
             });
 
             socket.on('update_state', (data) => {
                 currentSimTime = data.time;
                 document.getElementById('sim-time').textContent = `${currentSimTime.toFixed(2)}s`;
-                activeDronesEl.textContent = data.drones.length;
-                data.drones.forEach(drone => {
-                    if (!drone.position) return;
-                    if (!droneObjects[drone.flight_id]) {
-                        const geometry = new THREE.SphereGeometry(5, 16, 16);
-                        const material = new THREE.MeshStandardMaterial({ color: 0xffa500 });
-                        const droneMesh = new THREE.Mesh(geometry, material);
-                        
-                        const labelDiv = document.createElement('div');
-                        labelDiv.className = 'drone-label';
-                        labelDiv.textContent = drone.flight_id.replace('_', ' ');
-                        const droneLabel = new THREE.CSS3DObject(labelDiv);
-                        droneLabel.position.set(0, 15, 0);
-                        droneMesh.add(droneLabel);
-                        
-                        droneObjects[drone.flight_id] = droneMesh;
-                        scene.add(droneMesh);
-                    }
-                    droneObjects[drone.flight_id].position.set(drone.position.x, drone.position.z, drone.position.y);
-                });
+                activeDronesEl.textContent = Object.values(droneObjects).filter(d => d.mesh.visible).length;
             });
             socket.on('simulation_stopped', resetSimUI);
 
             // --- UI Event Listeners ---
-            document.getElementById('start-sim-btn').addEventListener('click', () => {
+            startBtn.addEventListener('click', () => {
                 socket.emit('start_simulation');
-                const btn = document.getElementById('start-sim-btn');
-                btn.textContent = "Running...";
-                btn.disabled = true;
-                btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-                btn.classList.add('bg-gray-500', 'cursor-not-allowed');
+                startBtn.textContent = "Running...";
+                startBtn.disabled = true;
+                startBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                startBtn.classList.add('bg-gray-400');
+                stopBtn.disabled = false;
+                stopBtn.classList.remove('bg-gray-400');
+                stopBtn.classList.add('bg-red-600', 'hover:bg-red-700');
                 simulationStatusEl.textContent = 'RUNNING';
                 simulationStatusEl.classList.add('text-green-600');
                 simulationStatusEl.classList.remove('text-gray-500');
             });
             
-            document.getElementById('stop-sim-btn').addEventListener('click', () => socket.emit('stop_simulation'));
-            document.getElementById('disconnect-btn').addEventListener('click', () => socket.disconnect());
-            document.getElementById('connect-btn').addEventListener('click', () => socket.connect());
+            stopBtn.addEventListener('click', () => socket.emit('stop_simulation'));
+            disconnectBtn.addEventListener('click', () => socket.disconnect());
+            connectBtn.addEventListener('click', () => socket.connect());
             
             document.getElementById('zoom-in-btn').addEventListener('click', () => { camera.zoom *= 1.2; camera.updateProjectionMatrix(); });
             document.getElementById('zoom-out-btn').addEventListener('click', () => { camera.zoom /= 1.2; camera.updateProjectionMatrix(); });
@@ -479,15 +488,60 @@
                 drawConflict();
             });
 
-            document.getElementById('check-airspace-btn').addEventListener('click', async () => {
+            // --- Input Validation ---
+            const missionStartTimeInput = document.getElementById('mission-start-time');
+            const missionEndTimeInput = document.getElementById('mission-end-time');
+            const safetyBufferInput = document.getElementById('safety-buffer');
+            const timeErrorEl = document.getElementById('time-error');
+            const bufferErrorEl = document.getElementById('buffer-error');
+
+            function validateInputs() {
+                const startTime = parseInt(missionStartTimeInput.value);
+                const endTime = parseInt(missionEndTimeInput.value);
+                const buffer = parseFloat(safetyBufferInput.value);
+                let isTimeValid = true;
+                let isBufferValid = true;
+
+                if (isNaN(startTime) || isNaN(endTime) || startTime >= endTime) {
+                    missionStartTimeInput.classList.add('input-error');
+                    missionEndTimeInput.classList.add('input-error');
+                    timeErrorEl.classList.remove('hidden');
+                    isTimeValid = false;
+                } else {
+                    missionStartTimeInput.classList.remove('input-error');
+                    missionEndTimeInput.classList.remove('input-error');
+                    timeErrorEl.classList.add('hidden');
+                }
+
+                if (isNaN(buffer) || buffer < 25) {
+                    safetyBufferInput.classList.add('input-error');
+                    bufferErrorEl.classList.remove('hidden');
+                    isBufferValid = false;
+                } else {
+                    safetyBufferInput.classList.remove('input-error');
+                    bufferErrorEl.classList.add('hidden');
+                }
+                
+                const isConnected = socket.connected;
+                checkAirspaceBtn.disabled = !isTimeValid || !isBufferValid || !isConnected;
+                if (!checkAirspaceBtn.disabled) {
+                    checkAirspaceBtn.classList.remove('bg-gray-400');
+                } else {
+                    checkAirspaceBtn.classList.add('bg-gray-400');
+                }
+            }
+            missionStartTimeInput.addEventListener('input', validateInputs);
+            missionEndTimeInput.addEventListener('input', validateInputs);
+            safetyBufferInput.addEventListener('input', validateInputs);
+
+            checkAirspaceBtn.addEventListener('click', async () => {
                 if (primaryWaypoints.length < 2) {
                     alert("Please define at least two waypoints.");
                     return;
                 }
                 
-                const statusContent = document.getElementById('status-content');
                 const conflictDetailsDiv = document.getElementById('conflict-details');
-                statusContent.innerHTML = `<span class="font-bold text-lg text-yellow-600">CHECKING...</span>`;
+                statusContentEl.innerHTML = `<span class="font-bold text-lg text-yellow-600">CHECKING...</span>`;
                 conflictDetailsDiv.innerHTML = '';
                 conflictResult = null;
                 if (primaryDrone) {
@@ -496,11 +550,13 @@
                 }
 
                 const droneModelSelect = document.getElementById('drone-model');
+                const safetyBuffer = parseFloat(safetyBufferInput.value);
                 const missionPayload = {
                     waypoints: primaryWaypoints,
-                    start_time: parseInt(document.getElementById('mission-start-time').value),
-                    end_time: parseInt(document.getElementById('mission-end-time').value),
-                    drone_model: droneModelSelect.options[droneModelSelect.selectedIndex].text.split(' ')[0]
+                    start_time: parseInt(missionStartTimeInput.value),
+                    end_time: parseInt(missionEndTimeInput.value),
+                    drone_model: droneModelSelect.options[droneModelSelect.selectedIndex].text.split(' ')[0],
+                    safety_buffer: safetyBuffer
                 };
 
                 try {
@@ -512,18 +568,18 @@
                     const result = await response.json();
                     if (result.error) throw new Error(result.error);
                     
-                    conflictResult = result;
+                    conflictResult = {...result, safety_buffer: safetyBuffer};
                     drawConflict();
 
                     if (result.status === "CONFLICT") {
-                        statusContent.innerHTML = `<span class="font-bold text-lg text-red-600">CONFLICT</span>`;
+                        statusContentEl.innerHTML = `<span class="font-bold text-lg text-red-600">CONFLICT</span>`;
                         conflictDetailsDiv.innerHTML = `
                             <p><strong>Flight ID:</strong> ${result.flight_id}</p>
                             <p><strong>Time:</strong> ${result.time.toFixed(2)}s</p>
                             <p><strong>Location (X,Y,Z):</strong> ${result.location.x.toFixed(1)}, ${result.location.y.toFixed(1)}, ${result.location.z.toFixed(1)}</p>
                         `;
                     } else {
-                        statusContent.innerHTML = `<span class="font-bold text-lg text-green-600">CLEAR</span>`;
+                        statusContentEl.innerHTML = `<span class="font-bold text-lg text-green-600">CLEAR</span>`;
                         const droneSpeed = parseFloat(droneModelSelect.value);
                         const etas = calculateETAs(primaryWaypoints, missionPayload.start_time, droneSpeed);
                         
@@ -535,7 +591,7 @@
                         scene.add(droneMesh);
                     }
                 } catch (e) {
-                    statusContent.innerHTML = `<span class="font-bold text-lg text-red-600">ERROR</span>`;
+                    statusContentEl.innerHTML = `<span class="font-bold text-lg text-red-600">ERROR</span>`;
                     alert(`Could not connect to backend server. Is it running? \n\nError: ${e.message}`);
                 }
             });
@@ -545,7 +601,30 @@
                 try {
                     const response = await fetch('http://127.0.0.1:5000/get_scenario_data');
                     simulatedFlightsData = await response.json();
-                    drawStaticPaths();
+                    
+                    simulatedFlightsData.forEach(flight => {
+                        const geometry = new THREE.SphereGeometry(5, 16, 16);
+                        const material = new THREE.MeshStandardMaterial({ color: 0xffa500 });
+                        const droneMesh = new THREE.Mesh(geometry, material);
+                        droneMesh.visible = false;
+
+                        const pathMaterial = new THREE.LineDashedMaterial({ color: 0xffa500, dashSize: 5, gapSize: 5, transparent: true, opacity: 0.5 });
+                        const pathGeometry = new THREE.BufferGeometry().setFromPoints(flight.waypoints.map(p => new THREE.Vector3(p.x, p.z, p.y)));
+                        const path = new THREE.Line(pathGeometry, pathMaterial);
+                        path.computeLineDistances();
+                        path.visible = false;
+                        scene.add(path);
+                        
+                        const labelDiv = document.createElement('div');
+                        labelDiv.className = 'drone-label';
+                        labelDiv.textContent = flight.flight_id.replace('_', ' ');
+                        const droneLabel = new THREE.CSS3DObject(labelDiv);
+                        droneLabel.position.set(0, 15, 0);
+                        droneMesh.add(droneLabel);
+                        
+                        droneObjects[flight.flight_id] = {mesh: droneMesh, waypoints: flight.waypoints, timestamps: flight.timestamps, path: path};
+                        scene.add(droneMesh);
+                    });
                 } catch (e) {
                     alert('Could not fetch scenario data from the backend. Please ensure the server is running and refresh the page.');
                 }
