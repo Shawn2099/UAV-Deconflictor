@@ -1,0 +1,165 @@
+{
+  "scenarios": [
+    {
+      "name": "Showcase Scenario with True Conflict",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 90,
+        "waypoints": [
+          { "x": 500, "y": 500, "z": 100 },
+          { "x": 300, "y": 700, "z": 125 },
+          { "x": 500, "y": 500, "z": 150 },
+          { "x": 700, "y": 700, "z": 175 },
+          { "x": 500, "y": 500, "z": 200 },
+          { "x": 700, "y": 300, "z": 225 },
+          { "x": 500, "y": 500, "z": 250 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "CONFLICT-VERTICAL",
+          "waypoints": [
+            { "x": 500, "y": 500, "z": 120 },
+            { "x": 500, "y": 500, "z": 180 }
+          ],
+          "timestamps": [20, 24]
+        },
+        {
+          "flight_id": "SURVEY-DRONE",
+          "waypoints": [
+            { "x": 100, "y": 100, "z": 50 },
+            { "x": 900, "y": 100, "z": 50 }
+          ],
+          "timestamps": [0, 38.09]
+        }
+      ]
+    },
+    {
+      "name": "Conflict-Free Scenario",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 100,
+        "waypoints": [
+          { "x": 100, "y": 100, "z": 50 },
+          { "x": 200, "y": 800, "z": 75 },
+          { "x": 800, "y": 200, "z": 100 },
+          { "x": 900, "y": 900, "z": 125 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "CLEAR-PATH-1",
+          "waypoints": [
+            { "x": 0, "y": 500, "z": 300 },
+            { "x": 1000, "y": 500, "z": 300 }
+          ],
+          "timestamps": [0, 47.62]
+        }
+      ]
+    },
+    {
+      "name": "Edge Case 1: Mission Time Violation",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 70,
+        "waypoints": [
+          { "x": 0, "y": 0, "z": 100 },
+          { "x": 2000, "y": 0, "z": 100 }
+        ]
+      },
+      "simulated_flights": []
+    },
+    {
+      "name": "Edge Case 2: Parallel Near Miss",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 60,
+        "waypoints": [
+          { "x": 0, "y": 50, "z": 100 },
+          { "x": 1000, "y": 50, "z": 100 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "PARALLEL-NEAR-MISS",
+          "waypoints": [
+            { "x": 0, "y": 101, "z": 100 },
+            { "x": 1000, "y": 101, "z": 100 }
+          ],
+          "timestamps": [0, 50]
+        }
+      ]
+    },
+    {
+      "name": "Edge Case 3: Head-on with Altitude Separation",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 60,
+        "waypoints": [
+          { "x": 0, "y": 500, "z": 100 },
+          { "x": 1000, "y": 500, "z": 100 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "ALTITUDE-SEPARATION",
+          "waypoints": [
+            { "x": 1000, "y": 500, "z": 160 },
+            { "x": 0, "y": 500, "z": 160 }
+          ],
+          "timestamps": [0, 50]
+        }
+      ]
+    },
+    {
+      "name": "Edge Case 4: Stationary Drone Conflict",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 60,
+        "waypoints": [
+          { "x": 0, "y": 0, "z": 100 },
+          { "x": 1000, "y": 0, "z": 100 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "HOVERING-DRONE",
+          "waypoints": [
+            { "x": 500, "y": 30, "z": 100 },
+            { "x": 500, "y": 30, "z": 100 }
+          ],
+          "timestamps": [20, 30]
+        }
+      ]
+    },
+    {
+      "name": "Edge Case 5: Conflict Exactly at a Waypoint",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 60,
+        "waypoints": [
+          { "x": 0, "y": 0, "z": 100 },
+          { "x": 500, "y": 500, "z": 150 },
+          { "x": 1000, "y": 0, "z": 200 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "WAYPOINT-INTERCEPT",
+          "waypoints": [
+            { "x": 500, "y": 450, "z": 150 },
+            { "x": 500, "y": 550, "z": 150 }
+          ],
+          "timestamps": [30.45, 40.45]
+        }
+      ]
+    }
+  ]
+}
