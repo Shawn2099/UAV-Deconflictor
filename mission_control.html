@@ -230,8 +230,9 @@
                 
                 if (primaryDrone) {
                     const pos = getPositionOnPath(primaryDrone.waypoints, primaryDrone.etas, currentSimTime);
-                    primaryDrone.mesh.visible = !!pos;
-                    if (pos) {
+                    const isVisible = !!pos;
+                    primaryDrone.mesh.visible = isVisible;
+                    if (isVisible) {
                         primaryDrone.mesh.position.set(pos.x, pos.z, pos.y);
                     }
                 }
@@ -239,6 +240,8 @@
                 Object.values(droneObjects).forEach(drone => {
                     const isVisible = (currentSimTime >= drone.timestamps[0] && currentSimTime <= drone.timestamps[drone.timestamps.length - 1]);
                     drone.mesh.visible = isVisible;
+                    // --- BUG FIX: Also toggle visibility of the label (child of the mesh) ---
+                    drone.mesh.children[0].visible = isVisible;
                     drone.path.visible = isVisible;
                     if (isVisible) {
                         const pos = getPositionOnPath(drone.waypoints, drone.timestamps, currentSimTime);
@@ -324,7 +327,7 @@
                         return { x: p1.x + progress * (p2.x - p1.x), y: p1.y + progress * (p2.y - p1.y), z: p1.z + progress * (p2.z - p1.z) };
                     }
                 }
-                return null;
+                return waypoints[waypoints.length - 1];
             }
 
             // --- WebSocket Handlers ---
@@ -392,7 +395,16 @@
                 document.getElementById('sim-time').textContent = `${currentSimTime.toFixed(2)}s`;
                 activeDronesEl.textContent = Object.values(droneObjects).filter(d => d.mesh.visible).length;
             });
-            socket.on('simulation_stopped', resetSimUI);
+            socket.on('simulation_stopped', () => {
+                resetSimUI();
+                const wasRunning = simulationStatusEl.textContent === 'RUNNING';
+                if (wasRunning) {
+                    statusContentEl.innerHTML = `<span class="font-bold text-lg text-blue-600">SIMULATION COMPLETE</span>`;
+                    setTimeout(() => {
+                        statusContentEl.innerHTML = `<span class="font-bold text-lg text-gray-500">PENDING</span>`;
+                    }, 3000);
+                }
+            });
 
             // --- UI Event Listeners ---
             startBtn.addEventListener('click', () => {
@@ -549,7 +561,6 @@
                     primaryDrone = null;
                 }
                 
-                // --- USABILITY FIX: Disable planning mode after check ---
                 planningToggle.checked = false;
                 planningToggle.dispatchEvent(new Event('change'));
 
@@ -596,7 +607,6 @@
                         
                         primaryDrone = { mesh: droneMesh, waypoints: primaryWaypoints, etas: etas };
                         scene.add(droneMesh);
-                        // Keep planned path and markers for reference
                         drawPlannedPath();
                         drawWaypointMarkers(); 
                     }
