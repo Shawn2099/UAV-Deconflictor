@@ -1,11 +1,10 @@
 """
 heavy_duty_benchmark.py
 
-This script performs an extreme-load benchmark on the deconfliction engine.
-It is designed to test the system's performance against a large number of
-drones, each with a long and complex multi-waypoint flight path.
-
-This specifically stresses the per-flight workload of the broad-phase filter.
+[V4 - The Final "Swarm" Test]
+This script performs the ultimate stress test on the deconfliction engine.
+It simulates a massive, dense swarm of 10,000 drones and forces the engine
+to perform a narrow-phase check on approximately 600 potential candidates.
 """
 
 import cProfile
@@ -17,43 +16,41 @@ import time
 from src.data_models import Waypoint, PrimaryMission, SimulatedFlight
 from src.deconfliction_logic import check_conflicts_hybrid
 
-def generate_complex_flight(flight_id: int) -> SimulatedFlight:
+def generate_swarm(num_flights: int) -> list[SimulatedFlight]:
     """
-    Generates a single drone flight with a complex, 100-waypoint "random walk" path.
+    Generates a dense, wide cluster of drones to produce a specific
+    number of potential candidates.
     """
-    waypoints = []
-    timestamps = []
+    flights = []
+    
+    center_x, center_y, center_z = 500, 0, 100
+    center_t = 20
 
-    # Start the drone far away from the primary mission's area of interest
-    current_x = random.uniform(10000, 20000)
-    current_y = random.uniform(10000, 20000)
-    current_z = random.uniform(100, 500)
-    current_t = random.uniform(0, 100)
+    for i in range(num_flights):
+        # By increasing the Y-axis randomness, we can tune the candidate count
+        start_x = center_x + random.uniform(-200, 200)
+        start_y = center_y + random.uniform(-400, 400) # Wider cluster
+        start_z = center_z + random.uniform(-50, 50)
+        start_t = center_t + random.uniform(-10, 10)
 
-    # Add the starting point
-    waypoints.append(Waypoint(current_x, current_y, current_z))
-    timestamps.append(current_t)
+        end_x = center_x + random.uniform(-200, 200)
+        end_y = center_y + random.uniform(-400, 400) # Wider cluster
+        end_z = center_z + random.uniform(-50, 50)
+        end_t = start_t + random.uniform(5, 10)
 
-    # Generate 99 more waypoints
-    for _ in range(99):
-        current_x += random.uniform(-200, 200)
-        current_y += random.uniform(-200, 200)
-        current_z += random.uniform(-50, 50)
-        current_t += random.uniform(10, 30) # Time for each segment
-        waypoints.append(Waypoint(current_x, current_y, current_z))
-        timestamps.append(current_t)
-
-    return SimulatedFlight(
-        flight_id=f"COMPLEX_DRONE_{flight_id}",
-        waypoints=waypoints,
-        timestamps=timestamps
-    )
+        flight = SimulatedFlight(
+            flight_id=f"SWARM_DRONE_{i}",
+            waypoints=[Waypoint(start_x, start_y, start_z), Waypoint(end_x, end_y, end_z)],
+            timestamps=[start_t, end_t]
+        )
+        flights.append(flight)
+    return flights
 
 def run_heavy_benchmark():
     """
     Sets up and runs the high-complexity deconfliction scenario.
     """
-    print("--- Heavy-Duty Performance Benchmark ---")
+    print("--- Heavy-Duty Performance Benchmark (Swarm Test) ---")
     
     # --- 1. Configuration ---
     config = {
@@ -71,11 +68,19 @@ def run_heavy_benchmark():
         end_time=50
     )
     
-    num_complex_flights = 10000
-    print(f"Generating a complex airspace with {num_complex_flights} drones, each with 100 waypoints...")
+    guaranteed_conflict = SimulatedFlight(
+        "GUARANTEED_CONFLICT",
+        [Waypoint(500, 0, 100), Waypoint(500, 0, 100)],
+        [20, 21]
+    )
+
+    # *** INCREASED LOAD TO 10,000 ***
+    num_swarm_drones = 10000
+    print(f"Generating a 'swarm' with {num_swarm_drones + 1} total simulated flights...")
     
     start_gen_time = time.time()
-    simulated_flights = [generate_complex_flight(i) for i in range(num_complex_flights)]
+    # The conflict is still at the END of the list to force a full check
+    simulated_flights = generate_swarm(num_swarm_drones) + [guaranteed_conflict]
     gen_duration = time.time() - start_gen_time
     print(f"Airspace generation took {gen_duration:.2f} seconds.")
 
@@ -95,7 +100,7 @@ def run_heavy_benchmark():
 
     # --- 4. Print the Results ---
     print("\n--- Benchmark Complete ---")
-    print(f"Deconfliction Result: {result['status']}")
+    print(f"Deconfliction Result: {result['status']} (Flight ID: {result.get('flight_id')})")
     print("\n--- Profiler Report ---")
     
     stats = pstats.Stats(profiler).sort_stats('cumtime')
