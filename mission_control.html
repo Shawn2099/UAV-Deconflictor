@@ -548,6 +548,10 @@
                     scene.remove(primaryDrone.mesh);
                     primaryDrone = null;
                 }
+                
+                // --- USABILITY FIX: Disable planning mode after check ---
+                planningToggle.checked = false;
+                planningToggle.dispatchEvent(new Event('change'));
 
                 const droneModelSelect = document.getElementById('drone-model');
                 const safetyBuffer = parseFloat(safetyBufferInput.value);
@@ -578,6 +582,9 @@
                             <p><strong>Time:</strong> ${result.time.toFixed(2)}s</p>
                             <p><strong>Location (X,Y,Z):</strong> ${result.location.x.toFixed(1)}, ${result.location.y.toFixed(1)}, ${result.location.z.toFixed(1)}</p>
                         `;
+                    } else if (result.status === "MISSION_TIME_VIOLATION") {
+                        statusContentEl.innerHTML = `<span class="font-bold text-lg text-orange-500">INVALID</span>`;
+                        conflictDetailsDiv.innerHTML = `<p>${result.message}</p>`;
                     } else {
                         statusContentEl.innerHTML = `<span class="font-bold text-lg text-green-600">CLEAR</span>`;
                         const droneSpeed = parseFloat(droneModelSelect.value);
@@ -589,9 +596,9 @@
                         
                         primaryDrone = { mesh: droneMesh, waypoints: primaryWaypoints, etas: etas };
                         scene.add(droneMesh);
-                        // --- Usability Fix: Clear planned path after launch ---
-                        if (plannedPathLine) scene.remove(plannedPathLine);
-                        drawWaypointMarkers(); // Keep markers for reference
+                        // Keep planned path and markers for reference
+                        drawPlannedPath();
+                        drawWaypointMarkers(); 
                     }
                 } catch (e) {
                     statusContentEl.innerHTML = `<span class="font-bold text-lg text-red-600">ERROR</span>`;
@@ -605,7 +612,6 @@
                     const response = await fetch('http://127.0.0.1:5000/get_scenario_data');
                     simulatedFlightsData = await response.json();
                     
-                    // --- BUG FIX: Create all drone objects ONCE on load ---
                     simulatedFlightsData.forEach(flight => {
                         const geometry = new THREE.SphereGeometry(5, 16, 16);
                         const material = new THREE.MeshStandardMaterial({ color: 0xffa500 });
