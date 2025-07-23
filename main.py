@@ -1,17 +1,13 @@
 """
 main.py
 
-[V20 - Data-Driven Scenarios]
+[V21 - Refactored for Testability]
 This script serves as the entry point for the UAV Strategic Deconfliction system.
-
-It has been refactored to be fully data-driven. All scenario definitions are
-loaded from an external `scenarios.json` file, separating the test data from
-the application logic.
+Its core logic has been moved into a `main_runner` function to allow for
+automated integration testing.
 """
 
 import json
-import numpy as np
-import math
 from typing import List, Dict, Any
 
 # --- Import project modules ---
@@ -65,14 +61,14 @@ def run_scenario(scenario_name: str, primary_mission: PrimaryMission, primary_dr
     if generate_visualization:
         output_filename = f"{scenario_name.replace(' ', '_').lower()}_final.gif"
         print(f"Generating visualization: '{output_filename}'...")
-        
         primary_etas_for_viz = calculate_etas(primary_mission.waypoints, primary_mission.start_time, primary_drone_speed)
-
         create_4d_animation(primary_mission, simulated_flights, primary_etas_for_viz, conflict_result, config, output_filename)
         print("Visualization complete.")
 
-if __name__ == "__main__":
-    # --- Load Configuration and Scenarios ---
+def main_runner():
+    """
+    The core logic of the application, designed to be called from __main__ or a test suite.
+    """
     config_data = load_json_file('config.json')
     scenario_data = load_json_file('scenarios.json')
 
@@ -81,15 +77,12 @@ if __name__ == "__main__":
         print("FATAL: 'drone_performance_profiles' not found in config.json.")
         exit(1)
 
-    # --- Ask user about visualization ---
     viz_choice = input("Do you want to generate GIF visualizations for the scenarios? (y/n): ").lower().strip()
     should_visualize = viz_choice == 'y'
 
-    # --- Loop through scenarios from the file ---
     for scenario in scenario_data.get("scenarios", []):
         scenario_name = scenario.get("name", "Unnamed Scenario")
         
-        # --- Parse Primary Mission ---
         mission_details = scenario.get("primary_mission", {})
         primary_waypoints = [Waypoint(**wp) for wp in mission_details.get("waypoints", [])]
         primary_mission = PrimaryMission(
@@ -98,11 +91,9 @@ if __name__ == "__main__":
             end_time=mission_details.get("end_time", 3600)
         )
         
-        # Get the correct speed for the primary drone model
         primary_drone_model = mission_details.get("drone_model", "")
         primary_drone_speed = drone_profiles.get(primary_drone_model, {}).get("speed_mps", 20.0)
 
-        # --- Parse Simulated Flights ---
         simulated_flights = []
         for flight_data in scenario.get("simulated_flights", []):
             sim_waypoints = [Waypoint(**wp) for wp in flight_data.get("waypoints", [])]
@@ -113,7 +104,6 @@ if __name__ == "__main__":
             )
             simulated_flights.append(sim_flight)
 
-        # --- Run the scenario ---
         run_scenario(
             scenario_name,
             primary_mission,
@@ -122,3 +112,6 @@ if __name__ == "__main__":
             config_data,
             should_visualize
         )
+
+if __name__ == "__main__":
+    main_runner()
