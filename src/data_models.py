@@ -4,6 +4,11 @@ data_models.py
 This module defines the core data structures used throughout the deconfliction application.
 Using dataclasses provides a concise and clear way to model the data for waypoints,
 primary missions, and simulated drone flights.
+
+[V2 - Added Validation]
+This version adds __post_init__ validation to the data classes to ensure their
+logical integrity upon creation. This prevents invalid data from propagating
+through the system.
 """
 
 from dataclasses import dataclass
@@ -17,9 +22,7 @@ class Waypoint:
     Attributes:
         x (float): The x-coordinate.
         y (float): The y-coordinate.
-        z (float): The z-coordinate (altitude). For the initial 2D MVP,
-                   this will be set to 0, but it is included for future
-                   3D/4D implementation.
+        z (float): The z-coordinate (altitude).
     """
     x: float
     y: float
@@ -32,14 +35,22 @@ class PrimaryMission:
 
     Attributes:
         waypoints (List[Waypoint]): A list of Waypoint objects defining the
-                                     intended route.
-        start_time (int): The earliest possible start time for the mission,
-                          represented as an integer (e.g., seconds from epoch).
+                                     intended route. Must contain at least 2.
+        start_time (int): The earliest possible start time for the mission.
         end_time (int): The latest possible completion time for the mission.
+                        Must be greater than start_time.
     """
     waypoints: List[Waypoint]
     start_time: int
     end_time: int
+
+    def __post_init__(self):
+        """Validates the mission's integrity after initialization."""
+        if len(self.waypoints) < 2:
+            raise ValueError("PrimaryMission must have at least two waypoints.")
+        if self.start_time >= self.end_time:
+            raise ValueError(f"PrimaryMission start_time ({self.start_time}) "
+                             f"must be before end_time ({self.end_time}).")
 
 @dataclass
 class SimulatedFlight:
@@ -51,10 +62,17 @@ class SimulatedFlight:
         waypoints (List[Waypoint]): A list of Waypoint objects defining the
                                      drone's fixed path.
         timestamps (List[int]): A list of integers representing the exact time
-                                the drone arrives at each corresponding waypoint
-                                in its path.
+                                the drone arrives at each corresponding waypoint.
+                                The length must match the waypoints list.
     """
     flight_id: str
     waypoints: List[Waypoint]
     timestamps: List[int]
 
+    def __post_init__(self):
+        """Validates the flight's integrity after initialization."""
+        if len(self.waypoints) != len(self.timestamps):
+            raise ValueError(
+                f"In flight '{self.flight_id}', the number of waypoints ({len(self.waypoints)}) "
+                f"must match the number of timestamps ({len(self.timestamps)})."
+            )

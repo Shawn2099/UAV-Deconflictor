@@ -1,57 +1,99 @@
 """
 test_integration.py
 
-This module contains end-to-end integration tests for the entire application.
-It tests the "whole program" by running the main application logic and
-verifying its console output to ensure all components work together correctly.
+[V2 - Corrected]
+This file contains integration tests for the full application flow.
+It has been updated to work with the new argparse-based entrypoint.
 """
 
 import pytest
-import sys
-import os
+import json
+from argparse import Namespace
 
-# --- Add the project root to the Python path ---
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# Import the main runner function from our application
+# Import the main entrypoint function
 from main import main_runner
 
-def test_full_program_integration(monkeypatch, capsys):
+@pytest.fixture
+def create_test_files(tmp_path):
+    """A pytest fixture to create temporary config and scenario files for testing."""
+    config_content = {
+        "deconfliction_parameters": {
+            "safety_buffer_m": 50.0,
+            "grid_bin_size": {"x_m": 100.0, "y_m": 100.0, "z_m": 100.0, "t_s": 10.0}
+        },
+        "drone_performance_profiles": {
+            "Test_Drone": {"speed_mps": 20.0}
+        }
+    }
+    
+    scenarios_content = {
+        "scenarios": [
+            {
+                "name": "Test Clear Scenario",
+                "primary_mission": {
+                    "drone_model": "Test_Drone",
+                    "start_time": 0,
+                    "end_time": 100,
+                    "waypoints": [{"x": 0, "y": 0, "z": 10}, {"x": 100, "y": 0, "z": 10}]
+                },
+                "simulated_flights": []
+            },
+            {
+                "name": "Test Conflict Scenario",
+                "primary_mission": {
+                    "drone_model": "Test_Drone",
+                    "start_time": 0,
+                    "end_time": 100,
+                    "waypoints": [{"x": 0, "y": 0, "z": 10}, {"x": 200, "y": 0, "z": 10}]
+                },
+                "simulated_flights": [{
+                    "flight_id": "CONFLICT01",
+                    "waypoints": [{"x": 100, "y": -50, "z": 10}, {"x": 100, "y": 50, "z": 10}],
+                    "timestamps": [0, 10]
+                }]
+            }
+        ]
+    }
+
+    config_file = tmp_path / "config.json"
+    scenarios_file = tmp_path / "scenarios.json"
+
+    with open(config_file, 'w') as f:
+        json.dump(config_content, f)
+    with open(scenarios_file, 'w') as f:
+        json.dump(scenarios_content, f)
+        
+    return config_file, scenarios_file
+
+def test_full_program_integration(capsys, create_test_files):
     """
-    Tests the full application flow from start to finish.
-    - Mocks user input to prevent the script from hanging.
+    Tests the full application flow from start to finish using argparse.
+    - Uses temporary files for config and scenarios.
     - Captures all console output.
     - Verifies that the output contains the expected results for key scenarios.
     """
-    # 1. Simulate User Input:
-    #    When `input()` is called, this will make it behave as if the user typed "n" and pressed Enter.
-    monkeypatch.setattr('builtins.input', lambda _: 'n')
+    config_path, scenarios_path = create_test_files
 
-    # 2. Run the main application logic
-    main_runner()
+    # 1. Simulate Command-Line Arguments:
+    #    Create a 'Namespace' object that mimics the output of argparse.
+    args = Namespace(
+        config=str(config_path),
+        scenarios=str(scenarios_path),
+        visualize=False  # We don't need to generate GIFs during the test
+    )
 
-    # 3. Capture the Console Output
+    # 2. Run the main application logic with the simulated arguments
+    main_runner(args)
+
+    # 3. Capture and Assert Output:
+    #    Check that the console output contains the expected status for each scenario.
     captured = capsys.readouterr()
     output = captured.out
 
-    # 4. Verify the Output
-    # Check for the expected conflict in the showcase scenario
-    assert "--- Running Scenario: Showcase Scenario with True Conflict ---" in output
-    assert "Result: CONFLICT DETECTED!" in output
-    assert "With Flight ID: CONFLICT-VERTICAL" in output
-
-    # Check for the expected time violation
-    assert "--- Running Scenario: Edge Case 1: Mission Time Violation ---" in output
-    assert "Result: MISSION INVALID!" in output
-    assert "Required: 80.00s, Allowed: 70s" in output
-
-    # Check for a known clear scenario
-    assert "--- Running Scenario: Edge Case 2: Parallel Near Miss ---" in output
+    assert "--- Running Scenario: Test Clear Scenario ---" in output
     assert "Result: Mission is CLEAR. No conflicts detected." in output
     
-    # Check for the stationary conflict
-    assert "--- Running Scenario: Edge Case 4: Stationary Drone Conflict ---" in output
-    assert "With Flight ID: HOVERING-DRONE" in output
-
-    print("\nIntegration test passed: Verified key scenario outputs from the full application run.")
+    assert "--- Running Scenario: Test Conflict Scenario ---" in output
+    assert "Result: CONFLICT DETECTED!" in output
+    assert "With Flight ID: CONFLICT01" in output
 

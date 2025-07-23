@@ -15,7 +15,7 @@ from .data_models import Waypoint
 def calculate_etas(mission_waypoints: List[Waypoint], start_time: float, drone_speed_mps: float) -> List[float]:
     """
     Calculates Estimated Times of Arrival (ETAs) for each waypoint in a list,
-    based on a constant drone speed.
+    based on a constant drone speed, using a vectorized approach.
 
     Args:
         mission_waypoints: A list of Waypoint objects.
@@ -24,25 +24,45 @@ def calculate_etas(mission_waypoints: List[Waypoint], start_time: float, drone_s
 
     Returns:
         A list of floats representing the ETA at each waypoint.
+
+    Raises:
+        ValueError: If drone_speed_mps is not a positive number.
     """
-    # Handle edge cases for empty or single-point missions
+    # --- Input Validation (Tier 1 Change) ---
+    # This is a critical fix. A non-positive speed is a physical impossibility
+    # that must be flagged as an error, not handled silently.
+    if drone_speed_mps <= 0:
+        raise ValueError("Drone speed must be a positive number.")
+
+    # --- Edge Case Handling ---
     if not mission_waypoints:
         return []
     if len(mission_waypoints) == 1:
         return [float(start_time)]
-        
-    # Handle edge case for zero or negative speed
-    if drone_speed_mps <= 0:
-        return [float(start_time)] * len(mission_waypoints)
 
-    # Calculate ETAs for each segment
-    etas = [float(start_time)]
-    for p1, p2 in zip(mission_waypoints, mission_waypoints[1:]):
-        p1_np = np.array([p1.x, p1.y, p1.z])
-        p2_np = np.array([p2.x, p2.y, p2.z])
-        segment_dist = np.linalg.norm(p2_np - p1_np)
-        
-        time_for_segment = segment_dist / drone_speed_mps
-        etas.append(etas[-1] + time_for_segment)
-        
-    return etas
+    # --- Vectorized Calculation (Tier 2 Change) ---
+    # This replaces the inefficient for-loop with a highly optimized NumPy
+    # implementation for better performance.
+    
+    # 1. Convert all waypoints to a single NumPy array.
+    coords = np.array([[wp.x, wp.y, wp.z] for wp in mission_waypoints])
+
+    # 2. Calculate vectors between consecutive points (e.g., p2-p1, p3-p2, ...).
+    vectors = np.diff(coords, axis=0)
+
+    # 3. Calculate the Euclidean distance (L2 norm) of all segment vectors at once.
+    segment_distances = np.linalg.norm(vectors, axis=1)
+
+    # 4. Calculate the travel time for each segment.
+    time_for_segments = segment_distances / drone_speed_mps
+
+    # 5. Calculate the cumulative sum of travel times to get the ETA relative to mission start.
+    #    We prepend 0 to represent the zero travel time to the first waypoint.
+    cumulative_travel_time = np.cumsum(np.insert(time_for_segments, 0, 0))
+
+    # 6. Add the mission start_time to get the final absolute ETAs.
+    etas = start_time + cumulative_travel_time
+    
+    return etas.tolist()
+
+

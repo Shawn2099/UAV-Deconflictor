@@ -1,85 +1,64 @@
 """
 test_data_models.py
 
-[Unit Tests for Core Data Structures]
-This module contains unit tests for the data models defined in `src.data_models`.
-It verifies that the dataclass models for Waypoint, PrimaryMission, and SimulatedFlight
-are correctly instantiated and that their attributes are properly handled.
-
-These tests ensure the fundamental building blocks of our system are reliable.
+Unit tests for the data model classes.
 """
 
 import pytest
-import os
-import sys
-
-# --- Add the project root to the Python path ---
-# This allows us to import modules from the 'src' directory.
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 from src.data_models import Waypoint, PrimaryMission, SimulatedFlight
 
-# --- Test Fixtures for Reusable Data ---
+# --- Test Cases for Waypoint ---
 
-@pytest.fixture
-def sample_waypoint():
-    """Provides a sample Waypoint object for testing."""
-    return Waypoint(x=10.0, y=20.0, z=30.0)
-
-@pytest.fixture
-def sample_waypoints_list():
-    """Provides a list of sample Waypoint objects."""
-    return [
-        Waypoint(x=0, y=0, z=100),
-        Waypoint(x=100, y=0, z=100),
-        Waypoint(x=100, y=100, z=100)
-    ]
-
-# --- Unit Tests for Waypoint ---
-
-def test_waypoint_creation(sample_waypoint):
-    """
-    Tests the successful creation of a Waypoint object and verifies its attributes.
-    """
-    assert sample_waypoint.x == 10.0
-    assert sample_waypoint.y == 20.0
-    assert sample_waypoint.z == 30.0
+def test_waypoint_creation():
+    """Tests basic Waypoint creation and attribute access."""
+    wp = Waypoint(x=10.5, y=-20.0, z=100.0)
+    assert wp.x == 10.5
+    assert wp.y == -20.0
+    assert wp.z == 100.0
 
 def test_waypoint_default_z():
-    """
-    Tests that the z attribute defaults to 0.0 if not provided.
-    """
-    waypoint = Waypoint(x=5, y=15)
-    assert waypoint.z == 0.0
+    """Tests that the z-coordinate defaults to 0.0 if not provided."""
+    wp = Waypoint(x=5, y=15)
+    assert wp.z == 0.0
 
-# --- Unit Tests for PrimaryMission ---
+# --- Test Cases for PrimaryMission ---
 
-def test_primary_mission_creation(sample_waypoints_list):
-    """
-    Tests the successful creation of a PrimaryMission object.
-    """
-    mission = PrimaryMission(
-        waypoints=sample_waypoints_list,
-        start_time=0,
-        end_time=100
-    )
-    assert len(mission.waypoints) == 3
-    assert mission.start_time == 0
-    assert mission.end_time == 100
-    assert mission.waypoints[1].x == 100.0
+def test_primary_mission_creation():
+    """Tests valid PrimaryMission creation."""
+    wps = [Waypoint(0,0,0), Waypoint(10,10,10)]
+    mission = PrimaryMission(waypoints=wps, start_time=100, end_time=200)
+    assert mission.waypoints == wps
+    assert mission.start_time == 100
+    assert mission.end_time == 200
 
-# --- Unit Tests for SimulatedFlight ---
+def test_primary_mission_invalid_waypoints():
+    """Tests that creating a mission with < 2 waypoints raises ValueError."""
+    with pytest.raises(ValueError, match="PrimaryMission must have at least two waypoints."):
+        PrimaryMission(waypoints=[Waypoint(0,0,0)], start_time=100, end_time=200)
 
-def test_simulated_flight_creation(sample_waypoints_list):
-    """
-    Tests the successful creation of a SimulatedFlight object.
-    """
-    flight = SimulatedFlight(
-        flight_id="SIM_DRONE_001",
-        waypoints=sample_waypoints_list,
-        timestamps=[0, 50, 100]
-    )
-    assert flight.flight_id == "SIM_DRONE_001"
-    assert len(flight.waypoints) == 3
-    assert len(flight.timestamps) == 3
-    assert flight.timestamps[2] == 100
+def test_primary_mission_invalid_time_window():
+    """Tests that creating a mission with start_time >= end_time raises ValueError."""
+    wps = [Waypoint(0,0,0), Waypoint(10,10,10)]
+    with pytest.raises(ValueError, match="must be before end_time"):
+        PrimaryMission(waypoints=wps, start_time=200, end_time=100)
+    with pytest.raises(ValueError, match="must be before end_time"):
+        PrimaryMission(waypoints=wps, start_time=200, end_time=200)
+
+# --- Test Cases for SimulatedFlight ---
+
+def test_simulated_flight_creation():
+    """Tests valid SimulatedFlight creation."""
+    wps = [Waypoint(0,0,0), Waypoint(10,10,10)]
+    ts = [100, 120]
+    flight = SimulatedFlight(flight_id="SIM001", waypoints=wps, timestamps=ts)
+    assert flight.flight_id == "SIM001"
+    assert flight.waypoints == wps
+    assert flight.timestamps == ts
+
+def test_simulated_flight_mismatched_lengths():
+    """Tests that creating a flight with mismatched waypoints and timestamps raises ValueError."""
+    wps = [Waypoint(0,0,0), Waypoint(10,10,10)]
+    ts = [100, 120, 140] # Mismatched length
+    with pytest.raises(ValueError, match="must match the number of timestamps"):
+        SimulatedFlight(flight_id="SIM002", waypoints=wps, timestamps=ts)
+

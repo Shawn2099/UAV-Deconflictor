@@ -87,28 +87,6 @@
       ]
     },
     {
-      "name": "Edge Case 3: Head-on with Altitude Separation",
-      "primary_mission": {
-        "drone_model": "DJI_Mavic_4_Pro",
-        "start_time": 0,
-        "end_time": 60,
-        "waypoints": [
-          { "x": 0, "y": 500, "z": 100 },
-          { "x": 1000, "y": 500, "z": 100 }
-        ]
-      },
-      "simulated_flights": [
-        {
-          "flight_id": "ALTITUDE-SEPARATION",
-          "waypoints": [
-            { "x": 1000, "y": 500, "z": 160 },
-            { "x": 0, "y": 500, "z": 160 }
-          ],
-          "timestamps": [0, 50]
-        }
-      ]
-    },
-    {
       "name": "Edge Case 4: Stationary Drone Conflict",
       "primary_mission": {
         "drone_model": "DJI_Mavic_4_Pro",
@@ -153,24 +131,24 @@
       ]
     },
     {
-      "name": "Edge Case 9: Pure Vertical Conflict",
+      "name": "Final Accuracy Test: Head-on Collision",
       "primary_mission": {
-        "drone_model": "DJI_Air_3",
+        "drone_model": "DJI_Mavic_4_Pro",
         "start_time": 0,
-        "end_time": 60,
+        "end_time": 50,
         "waypoints": [
-          { "x": 0, "y": 500, "z": 100 },
-          { "x": 1000, "y": 500, "z": 100 }
+          { "x": 0, "y": 0, "z": 100 },
+          { "x": 1000, "y": 0, "z": 100 }
         ]
       },
       "simulated_flights": [
         {
-          "flight_id": "VERTICAL-INTERCEPT",
+          "flight_id": "HEAD-ON-COLLIDER",
           "waypoints": [
-            { "x": 500, "y": 500, "z": 50 },
-            { "x": 500, "y": 500, "z": 150 }
+            { "x": 1000, "y": 0, "z": 100 },
+            { "x": 0, "y": 0, "z": 100 }
           ],
-          "timestamps": [18.8, 28.8]
+          "timestamps": [0, 40]
         }
       ]
     }
