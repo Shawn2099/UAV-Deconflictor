@@ -7,5 +7,13 @@
             "z_m": 100.0,
             "t_s": 10.0
         }
+    },
+    "drone_performance_profiles": {
+        "DJI_Mavic_4_Pro": {
+            "speed_mps": 25.0
+        },
+        "DJI_Air_3": {
+            "speed_mps": 21.0
+        }
     }
 }
