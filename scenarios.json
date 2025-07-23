@@ -28,6 +28,30 @@
       ]
     },
     {
+      "name": "Conflict-Free Scenario",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 100,
+        "waypoints": [
+          { "x": 100, "y": 100, "z": 50 },
+          { "x": 200, "y": 800, "z": 75 },
+          { "x": 800, "y": 200, "z": 100 },
+          { "x": 900, "y": 900, "z": 125 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "CLEAR-PATH-1",
+          "waypoints": [
+            { "x": 0, "y": 500, "z": 300 },
+            { "x": 1000, "y": 500, "z": 300 }
+          ],
+          "timestamps": [0, 47.62]
+        }
+      ]
+    },
+    {
       "name": "Edge Case 1: Mission Time Violation",
       "primary_mission": {
         "drone_model": "DJI_Mavic_4_Pro",
@@ -39,6 +63,50 @@
         ]
       },
       "simulated_flights": []
+    },
+    {
+      "name": "Edge Case 2: Parallel Near Miss",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 60,
+        "waypoints": [
+          { "x": 0, "y": 50, "z": 100 },
+          { "x": 1000, "y": 50, "z": 100 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "PARALLEL-NEAR-MISS",
+          "waypoints": [
+            { "x": 0, "y": 101, "z": 100 },
+            { "x": 1000, "y": 101, "z": 100 }
+          ],
+          "timestamps": [0, 50]
+        }
+      ]
+    },
+    {
+      "name": "Edge Case 3: Head-on with Altitude Separation",
+      "primary_mission": {
+        "drone_model": "DJI_Mavic_4_Pro",
+        "start_time": 0,
+        "end_time": 60,
+        "waypoints": [
+          { "x": 0, "y": 500, "z": 100 },
+          { "x": 1000, "y": 500, "z": 100 }
+        ]
+      },
+      "simulated_flights": [
+        {
+          "flight_id": "ALTITUDE-SEPARATION",
+          "waypoints": [
+            { "x": 1000, "y": 500, "z": 160 },
+            { "x": 0, "y": 500, "z": 160 }
+          ],
+          "timestamps": [0, 50]
+        }
+      ]
     },
     {
       "name": "Edge Case 4: Stationary Drone Conflict",
@@ -63,28 +131,6 @@
       ]
     },
     {
-      "name": "Edge Case 6: Grid Boundary Alignment (Clear)",
-      "primary_mission": {
-        "drone_model": "DJI_Mavic_4_Pro",
-        "start_time": 0,
-        "end_time": 60,
-        "waypoints": [
-          { "x": 500, "y": 500, "z": 100 },
-          { "x": 1500, "y": 500, "z": 100 }
-        ]
-      },
-      "simulated_flights": [
-        {
-          "flight_id": "BOUNDARY-RIDER",
-          "waypoints": [
-            { "x": 100.0, "y": 0, "z": 100 },
-            { "x": 100.0, "y": 1000, "z": 100 }
-          ],
-          "timestamps": [0, 50]
-        }
-      ]
-    },
-    {
       "name": "Edge Case 7: Hyper-Velocity Drone (Conflict)",
       "primary_mission": {
         "drone_model": "DJI_Mavic_4_Pro",
@@ -103,28 +149,6 @@
             { "x": 1000, "y": 500, "z": 100 }
           ],
           "timestamps": [0, 1]
-        }
-      ]
-    },
-    {
-      "name": "Edge Case 8: Zero-Duration 'Teleport' (Clear)",
-      "primary_mission": {
-        "drone_model": "DJI_Mavic_4_Pro",
-        "start_time": 0,
-        "end_time": 60,
-        "waypoints": [
-          { "x": 0, "y": 0, "z": 100 },
-          { "x": 1000, "y": 0, "z": 100 }
-        ]
-      },
-      "simulated_flights": [
-        {
-          "flight_id": "TELEPORTER",
-          "waypoints": [
-            { "x": 500, "y": -100, "z": 100 },
-            { "x": 500, "y": 100, "z": 100 }
-          ],
-          "timestamps": [25, 25]
         }
       ]
     },
