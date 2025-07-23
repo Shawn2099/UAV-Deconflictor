@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- Add-ons for Controls and Labels -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS3DRenderer.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -34,6 +34,7 @@
             border-radius: 4px;
             background: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(2px);
+            border: 1px solid rgba(0,0,0,0.1);
         }
     </style>
 </head>
@@ -114,7 +115,7 @@
             </div>
         </div>
         
-        <!-- Deconfliction Status Display -->
+        <!-- Mission Clearance Display -->
         <div id="status-display" class="bg-gray-100 p-4 rounded-lg border border-gray-300">
              <h2 class="text-xl font-semibold mb-2 text-gray-800">Mission Clearance</h2>
              <div id="status-content" class="text-center py-2 rounded-md bg-gray-200">
@@ -159,7 +160,7 @@
             scene.background = new THREE.Color(0xE1E1E1);
             const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 2000);
             const renderer = new THREE.WebGLRenderer({ antialias: true });
-            const labelRenderer = new THREE.CSS2DRenderer();
+            const labelRenderer = new THREE.CSS3DRenderer();
             const container = document.getElementById('main-canvas-container');
             container.appendChild(renderer.domElement);
             
@@ -374,8 +375,8 @@
                         const labelDiv = document.createElement('div');
                         labelDiv.className = 'drone-label';
                         labelDiv.textContent = drone.flight_id.replace('_', ' ');
-                        const droneLabel = new THREE.CSS2DObject(labelDiv);
-                        droneLabel.position.set(0, 10, 0);
+                        const droneLabel = new THREE.CSS3DObject(labelDiv);
+                        droneLabel.position.set(0, 15, 0);
                         droneMesh.add(droneLabel);
                         
                         droneObjects[drone.flight_id] = droneMesh;
@@ -516,7 +517,11 @@
 
                     if (result.status === "CONFLICT") {
                         statusContent.innerHTML = `<span class="font-bold text-lg text-red-600">CONFLICT</span>`;
-                        conflictDetailsDiv.innerHTML = `<p><strong>Flight ID:</strong> ${result.flight_id}</p><p><strong>Time:</strong> ${result.time.toFixed(2)}s</p>`;
+                        conflictDetailsDiv.innerHTML = `
+                            <p><strong>Flight ID:</strong> ${result.flight_id}</p>
+                            <p><strong>Time:</strong> ${result.time.toFixed(2)}s</p>
+                            <p><strong>Location (X,Y,Z):</strong> ${result.location.x.toFixed(1)}, ${result.location.y.toFixed(1)}, ${result.location.z.toFixed(1)}</p>
+                        `;
                     } else {
                         statusContent.innerHTML = `<span class="font-bold text-lg text-green-600">CLEAR</span>`;
                         const droneSpeed = parseFloat(droneModelSelect.value);
