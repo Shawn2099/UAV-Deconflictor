@@ -367,7 +367,7 @@
                 disconnectBtn.classList.remove('hidden');
                 startBtn.disabled = false;
                 startBtn.classList.remove('bg-gray-400');
-                validateInputs(); // Re-validate to enable check button
+                validateInputs();
                 fetchInitialData();
             });
             socket.on('disconnect', () => {
@@ -589,6 +589,9 @@
                         
                         primaryDrone = { mesh: droneMesh, waypoints: primaryWaypoints, etas: etas };
                         scene.add(droneMesh);
+                        // --- Usability Fix: Clear planned path after launch ---
+                        if (plannedPathLine) scene.remove(plannedPathLine);
+                        drawWaypointMarkers(); // Keep markers for reference
                     }
                 } catch (e) {
                     statusContentEl.innerHTML = `<span class="font-bold text-lg text-red-600">ERROR</span>`;
@@ -602,6 +605,7 @@
                     const response = await fetch('http://127.0.0.1:5000/get_scenario_data');
                     simulatedFlightsData = await response.json();
                     
+                    // --- BUG FIX: Create all drone objects ONCE on load ---
                     simulatedFlightsData.forEach(flight => {
                         const geometry = new THREE.SphereGeometry(5, 16, 16);
                         const material = new THREE.MeshStandardMaterial({ color: 0xffa500 });
