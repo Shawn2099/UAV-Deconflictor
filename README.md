@@ -27,9 +27,17 @@ That's where SkyGuard comes in. It's a strategic deconfliction system that acts 
 Ready to take control? Getting SkyGuard running is a breeze.
 
 ### Clone the Mothership
-Get the project code onto your local machine.
+Get the project code onto your local machine:
+
+```bash
+git clone https://github.com/Shawn2099/UAV-Deconflictor.git
+cd UAV-Deconflictor
+```
 
 ### Assemble Your Tools
+**Prerequisites**: Python 3.8+ and pip
+
+Install all the necessary Python libraries:
 Open a terminal in the project folder and run this command to install all the necessary Python libraries from our list.
 
 ```bash
@@ -64,14 +72,18 @@ Want to dig deeper? Here's how the project is laid out.
 
 ```
 UAV-Deconflictor/
-├── data/                 # Mission plans & configuration files
-│   ├── config.json
-│   └── scenarios.json
 ├── src/                  # The core logic and "secret sauce"
 │   ├── deconfliction_logic.py
-│   └── ...
+│   ├── data_models.py
+│   ├── visualization.py
+│   └── utils.py
 ├── tests/                # Our army of testing robots
-│   └── ...
+│   ├── test_deconfliction_logic.py
+│   └── test_data_models.py
+├── cypress/              # E2E testing suite
+│   └── e2e/
+├── config.json           # System configuration
+├── scenarios.json        # Test scenarios
 ├── mission_control.html  # The interactive 3D user interface
 ├── main.py               # A powerful command-line tool for automation
 ├── server.py             # The backend server for the UI
@@ -88,7 +100,19 @@ For developers and automation, main.py provides a way to run checks without the 
 
 **Example Command:**
 ```bash
-python main.py --scenarios data/my_test_mission.json --visualize
+python main.py --scenarios scenarios.json --visualize
+```
+
+## 🧪 Testing Your Sky Traffic Control
+
+Want to make sure everything works perfectly? We've got you covered:
+
+```bash
+# Run all tests
+python -m pytest tests/
+
+# Run the basic web interface tests
+./run-basic-tests.bat  # Windows
 ```
 
 ## 🎯 What Makes This Special?
