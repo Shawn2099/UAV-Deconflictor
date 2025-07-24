@@ -31,9 +31,10 @@ THREAD_LOCK = threading.Lock()
 # --- Load Static Data ---
 print("Loading configuration and scenario data...")
 try:
-    with open('config.json', 'r') as f:
+    # Updated paths to reflect files moved to 'data/' subdirectory
+    with open('data/config.json', 'r') as f:
         CONFIG_DATA = json.load(f)
-    with open('scenarios.json', 'r') as f:
+    with open('data/scenarios.json', 'r') as f:
         SCENARIO_FILE_CONTENT = json.load(f)
         SIMULATED_FLIGHTS_DATA = SCENARIO_FILE_CONTENT.get("scenarios", [{}])[0].get("simulated_flights", [])
         

@@ -154,7 +154,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- GLOBAL STATE ---
-            const socket = io("http://127.0.0.1:5000", { autoConnect: false });
+            window.socket = io("http://127.0.0.1:5000", { autoConnect: false });
             let primaryWaypoints = [];
             let simulatedFlightsData = [];
             let conflictResult = null;
@@ -240,7 +240,6 @@
                 Object.values(droneObjects).forEach(drone => {
                     const isVisible = (currentSimTime >= drone.timestamps[0] && currentSimTime <= drone.timestamps[drone.timestamps.length - 1]);
                     drone.mesh.visible = isVisible;
-                    // --- BUG FIX: Also toggle visibility of the label (child of the mesh) ---
                     drone.mesh.children[0].visible = isVisible;
                     drone.path.visible = isVisible;
                     if (isVisible) {
@@ -652,6 +651,13 @@
             
             socket.connect();
             animate();
+            
+            // --- EXPOSE FOR TESTING ---
+            window.app = {
+                primaryWaypoints: primaryWaypoints,
+                drawPlannedPath: drawPlannedPath,
+                drawWaypointMarkers: drawWaypointMarkers
+            };
         });
     </script>
 </body>

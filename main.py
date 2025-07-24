@@ -51,13 +51,13 @@ def run_scenario(scenario_name: str, primary_mission: PrimaryMission, primary_dr
     status = conflict_result.get("status")
     if status == "CONFLICT":
         print(f"Result: CONFLICT DETECTED!")
-        print(f"  - With Flight ID: {conflict_result.get('flight_id')}")
+        print(f"   - With Flight ID: {conflict_result.get('flight_id')}")
         loc = conflict_result.get('location', {})
-        print(f"  - At Location (x,y,z): ({loc.get('x', 0):.2f}, {loc.get('y', 0):.2f}, {loc.get('z', 0):.2f})")
-        print(f"  - At Time: {conflict_result.get('time', 0):.2f}s")
+        print(f"   - At Location (x,y,z): ({loc.get('x', 0):.2f}, {loc.get('y', 0):.2f}, {loc.get('z', 0):.2f})")
+        print(f"   - At Time: {conflict_result.get('time', 0):.2f}s")
     elif status == "MISSION_TIME_VIOLATION":
         print(f"Result: MISSION INVALID!")
-        print(f"  - Reason: {conflict_result.get('message')}")
+        print(f"   - Reason: {conflict_result.get('message')}")
     elif status == "CLEAR":
         print("Result: Mission is CLEAR. No conflicts detected.")
     else:
@@ -133,13 +133,13 @@ if __name__ == "__main__":
     parser.add_argument(
         '--config', 
         type=str, 
-        default='config.json',
+        default='data/config.json', # Updated path
         help='Path to the configuration JSON file.'
     )
     parser.add_argument(
         '--scenarios', 
         type=str, 
-        default='scenarios.json',
+        default='data/scenarios.json', # Updated path
         help='Path to the scenarios JSON file.'
     )
     parser.add_argument(
