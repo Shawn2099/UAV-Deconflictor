@@ -1,43 +1,16 @@
-# FlytBase Drone Deconfliction Service
-
-This project is a simulation of a central deconfliction service for drone missions, developed as part of the "FlytBase Robotics Assignment 2025". It checks a drone's planned mission for potential time and space conflicts with other active or planned drone flights.
-
-## 🚀 Project Objective
-
-The core objective is to implement a service that can:
-1.  Receive a drone's mission plan, which consists of a series of 4D waypoints (`latitude`, `longitude`, `altitude`, `time`).
-2.  Check this plan against a database of other drone missions.
-3.  Identify and flag any potential conflicts where two drones are too close to each other at the same point in time.
-
-## 📁 File Structure
-
-The project is organized into the following key files:
-- **`main.py`**: The main script to run the simulation.
-- **`src/data_models.py`**: Defines Pydantic or dataclass models for `Mission`, `Drone`, and `Waypoint`.
-- **`src/deconfliction_logic.py`**: Contains the core functions for calculating distances and checking for conflicts.
-- **`src/visualization.py`**: Includes functions to plot the drone flight paths for visual analysis.
-
-## 🛠️ Installation
-
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/](https://github.com/)[Your-GitHub-Handle]/flytbase_challenge.git
-    cd flytbase_challenge
-    ```
-2.  **Create and activate a virtual environment:**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    ```
-3.  **Install the required packages:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-    *(Note: You will need to create a `requirements.txt` file)*
-
-## ▶️ How to Run
-
-To run the deconfliction simulation, execute the `main.py` script from the project's root directory:
-
-```bash
-python main.py
+🚁 Sky Guardian: A Drone Traffic Control System🤔 What is this?Imagine a big, invisible playground in the sky where lots of toy drones are flying around. They all have their own paths and plans.This project is like being the playground monitor!You want to fly a new drone, but you have to make sure it won't bump into anyone else. This tool helps you draw a safe path for your new drone and checks it for you!✨ What can it do?👀 See all the Drones: Watch all the drones fly around in a cool 3D world, like a video game.✏️ Draw Your Path: You can use your mouse to draw a new flight path for your own drone, right on the screen!🚦 Check for Safety: With one click, the system's "super-brain" checks if your new path is safe from all the other drones.❗ Find the "Uh-Oh" Moments: If your path is not safe, it doesn't just say "No!". It shows you exactly where and when your drone would get too close to another one by showing a big red ball.🎮 How to Play With ItGetting started is as easy as 1-2-3-4!Step 1: Get the CodeYou need to have all the project files on your computer.Step 2: Give Python its ToolsOpen your computer's command line (like Terminal or PowerShell).Go to the project folder.Tell Python to get all the tools it needs from our list:pip install -r requirements.txt
+Step 3: Start the "Brain"In the same command line, start the main server. This is the brain of the operation!python server.py
+Step 4: Open the Control Center!Go to your web browser (like Chrome or Firefox) and open the mission_control.html file.That's it! You're now the drone traffic controller!🛠️ What's Inside? (The Ingredients)This project was built with some really cool tools:The Brain (Backend): Python, Flask, Flask-SocketIOThe Looks (Frontend): HTML, JavaScript, Tailwind CSSThe 3D Magic: Three.jsThe Smart Math: NumPyThe Testing Robots: Pytest, Hypothesis👨‍💻 For the Grown-Ups (A Peek Under the Hood)This project has two ways to run: the fun visual way (server.py) and a powerful command-line way (main.py).The File Cabinet (Project Structure)Here's how all the files are organized:UAV-Deconflictor/
+├── data/                 # Holds all the mission plans and settings
+│   ├── config.json
+│   └── scenarios.json
+├── src/                  # This is where the "super-brain" logic lives
+│   ├── deconfliction_logic.py
+│   └── ... (other python files)
+├── tests/                # The "testing robots" that check our work
+│   └── ... (all test files)
+├── mission_control.html  # The 3D visual control center
+├── main.py               # The command-line version of the tool
+├── server.py             # The brain for the visual control center
+└── README.md             # This file!
+The Command-Line Tool (main.py)The main.py file lets you run a safety check without opening the visual interface. It's great for automated checks. You can run it from your command line and give it instructions.How to use it:The basic command is python main.py. You can add extra instructions (arguments) to change what it does:--scenarios: Tell it which mission plan file to use.Example: python main.py --scenarios data/my_new_scenarios.json--config: Tell it which settings file to use.Example: python main.py --config data/high_risk_config.json--visualize: If you add this, it will run the check and also create a cool .gif animation of the flight!Example: python main.py --visualizeYou can combine them all, like this:python main.py --scenarios data/test_mission.json --visualize
