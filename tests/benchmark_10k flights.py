@@ -11,6 +11,13 @@ import cProfile
 import pstats
 import random
 import time
+import sys
+import os
+
+# Add the project root to the Python path to allow for `src` module imports
+# when running this script directly from the 'tests' directory.
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
 # --- Import project modules ---
 from src.data_models import Waypoint, PrimaryMission, SimulatedFlight

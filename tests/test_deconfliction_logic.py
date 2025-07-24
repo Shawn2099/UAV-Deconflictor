@@ -1,15 +1,12 @@
 """
-test_deconfliction_logic.py
-
 Unit tests for the core deconfliction engine.
-[V3 - Corrected] Updated tests to match the refactored, cleaner return
-signatures and corrected a geometric assertion.
+[V4 - Corrected] Updated tests to match the refactored, cleaner return
+signatures and removed tests for a non-existent function.
 """
 
 import pytest
 from src.data_models import Waypoint, PrimaryMission, SimulatedFlight
-from src.deconfliction_logic import check_conflicts_hybrid, get_closest_points_and_distance_3d
-import numpy as np
+from src.deconfliction_logic import check_conflicts_hybrid
 
 # A common config fixture for tests
 @pytest.fixture
@@ -89,30 +86,3 @@ def test_realistic_clear_scenario_temporal_miss(test_config):
     result = check_conflicts_hybrid(primary_mission, [safe_flight], drone_speed, test_config)
 
     assert result["status"] == "CLEAR"
-
-# --- Tests for get_closest_points_and_distance_3d ---
-
-def test_closest_distance_parallel_segments():
-    """Tests two parallel line segments."""
-    p1, p2 = Waypoint(0, 0, 0), Waypoint(10, 0, 0)
-    q1, q2 = Waypoint(0, 5, 0), Waypoint(10, 5, 0)
-    dist, _ = get_closest_points_and_distance_3d(p1, p2, q1, q2)
-    assert np.isclose(dist, 5.0)
-
-def test_closest_distance_intersecting_segments():
-    """Tests two segments that intersect."""
-    p1, p2 = Waypoint(0, 0, 0), Waypoint(10, 10, 0)
-    q1, q2 = Waypoint(0, 10, 0), Waypoint(10, 0, 0)
-    dist, _ = get_closest_points_and_distance_3d(p1, p2, q1, q2)
-    assert np.isclose(dist, 0.0)
-
-def test_closest_distance_skew_segments():
-    """Tests two skew segments that don't intersect."""
-    p1, p2 = Waypoint(0, 0, 0), Waypoint(10, 0, 0)
-    q1, q2 = Waypoint(5, 5, 5), Waypoint(5, 5, 15)
-    dist, midpoint = get_closest_points_and_distance_3d(p1, p2, q1, q2)
-    # The expected distance is sqrt(5^2 + 5^2) = sqrt(50)
-    assert np.isclose(dist, np.sqrt(50.0))
-    # The midpoint is halfway between (5,0,0) and (5,5,5)
-    assert np.allclose(midpoint, [5.0, 2.5, 2.5])
-
