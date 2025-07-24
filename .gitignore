@@ -39,3 +39,8 @@ venv.bak/
 # IDE / Editor specific
 .idea/
 .vscode/
+.hypothesis/
+.pytest_cache/
+cypress/
+node_modules/
+testing pics/
